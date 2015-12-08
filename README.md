@@ -15,7 +15,7 @@ In the test folder there are some simple Java server applications that can be us
 - Federico Dotta, Security Expert at @ Mediaservice.net
 
 # Screenshot
-![alt tag](https://raw.githubusercontent.com/federicodotta/Java-Deserialization-Scanner/JavaDeserializationScanner.png)
+![alt tag](https://raw.githubusercontent.com/federicodotta/Java-Deserialization-Scanner/master/JavaDeserializationScanner.png)
 
 # Installation 
 1.	Download Burp Suite: http://portswigger.net/burp/download.html
