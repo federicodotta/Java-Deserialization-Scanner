@@ -5,11 +5,14 @@ Java Deserialization Scanner uses custom payloads generated with a modified vers
 
 Currently, the passive checks of the Java Deserialiation Scanner reported the presence of serialized Java objects in the HTTP requests (in raw format or encoded in Base64) and the active checks actively scan for the presence of weak deserialization functions in conjuction with the presence of the following weak libraries:
 
-1.	Apache Commons Collections 3 (up to 3.2.1)
-2.	Apache Commons Collections 4 (up to 4.4.0)
+1.	Apache Commons Collections 3 (up to 3.2.1), with two different chains
+2.	Apache Commons Collections 4 (up to 4.4.0), with two different chains
 3.	Spring (up to 4.2.2)
+4.  Java 6 and Java 7 (<= Jdk7u21) without any weak library
 
 In the test folder there are some simple Java server applications that can be used to test the plugin. Every application employ a different vulnerable Java library.
+
+With the new version is also possible to execute manual tests with custom insertion points (both using raw payloads or base64 encoded payloads) using a dedicated tab.
 
 # Author
 - Federico Dotta, Security Expert at @ Mediaservice.net
@@ -22,11 +25,12 @@ In the test folder there are some simple Java server applications that can be us
 2.	Install Java Deserialization Scanner from the BApp Store or follow these steps:
 3.	Download the last release of Java Deserialization Scanner
 4.	Open Burp -> Extender -> Extensions -> Add -> Choose JavaDeserializationScannerXX.jar file
-5.	The plugin does not need any configuration
+5.	The plugin does not need any configuration to work, but is possible to disable active checks from the dedicated tab
 
 # User Guide
 1.	After installation, the Java Deserialization Scanner active and passive checks will be added to the Burp Suite scanner
 2.	Simply run the active or passive scanner in order to check also for weak Java deserialization
+3.  With the dedicated tab is also possible to execute manual testing by setting the injection point and executing the attack with all the payloads
 
 # Improving Java Deserialization Scanner
 In order to improve this extension, please report any issue founded in the plugin. Furthermore if you want report me any disclosed Java library usefull for the exploitation of this weakness and, if I have the time, I will add an active check for it in my plugin.
