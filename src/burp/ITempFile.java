@@ -26,8 +26,8 @@ public interface ITempFile
     byte[] getBuffer();
 
     /**
-     * This method is used to permanently delete the temporary file when it is
-     * no longer required.
+     * This method is deprecated and no longer performs any action.
      */
+    @Deprecated
     void delete();
 }

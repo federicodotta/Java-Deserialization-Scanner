@@ -18,6 +18,7 @@ package burp;
  */
 public interface IScannerInsertionPoint
 {
+
     /**
      * Used to indicate where the payload is inserted into the value of a URL
      * parameter.
@@ -65,10 +66,15 @@ public interface IScannerInsertionPoint
      */
     static final byte INS_HEADER = 0x20;
     /**
-     * Used to indicate where the payload is inserted into a REST parameter
-     * within the URL file path.
+     * Used to indicate where the payload is inserted into a URL path folder.
      */
-    static final byte INS_URL_REST = 0x21;
+    static final byte INS_URL_PATH_FOLDER = 0x21;
+    /**
+     * Used to indicate where the payload is inserted into a URL path folder.
+     * This is now deprecated; use <code>INS_URL_PATH_FOLDER</code> instead.
+     */
+    @Deprecated
+    static final byte INS_URL_PATH_REST = INS_URL_PATH_FOLDER;
     /**
      * Used to indicate where the payload is inserted into the name of an added
      * URL parameter.
@@ -79,6 +85,16 @@ public interface IScannerInsertionPoint
      * body parameter.
      */
     static final byte INS_PARAM_NAME_BODY = 0x23;
+    /**
+     * Used to indicate where the payload is inserted into the body of the HTTP
+     * request.
+     */
+    static final byte INS_ENTIRE_BODY = 0x24;
+    /**
+     * Used to indicate where the payload is inserted into the URL path
+     * filename.
+     */
+    static final byte INS_URL_PATH_FILENAME = 0x25;
     /**
      * Used to indicate where the payload is inserted at a location manually
      * configured by the user.
@@ -108,21 +124,23 @@ public interface IScannerInsertionPoint
      * This method returns the base value for this insertion point.
      *
      * @return the base value that appears in this insertion point in the base
-     * request being scanned, or
-     * <code>null</code> if there is no value in the base request that
-     * corresponds to this insertion point.
+     * request being scanned, or <code>null</code> if there is no value in the
+     * base request that corresponds to this insertion point.
      */
     String getBaseValue();
 
     /**
      * This method is used to build a request with the specified payload placed
-     * into the insertion point. Any necessary adjustments to the Content-Length
-     * header will be made by the Scanner itself when the request is issued, and
-     * there is no requirement for the insertion point to do this. <b>Note:</b>
-     * Burp's built-in scan checks do not apply any payload encoding (such as
-     * URL-encoding) when dealing with an extension-provided insertion point.
-     * Custom insertion points are responsible for performing any data encoding
-     * that is necessary given the nature and location of the insertion point.
+     * into the insertion point. There is no requirement for extension-provided
+     * insertion points to adjust the Content-Length header in requests if the
+     * body length has changed, although Burp-provided insertion points will
+     * always do this and will return a request with a valid Content-Length
+     * header.
+     * <b>Note:</b>
+     * Scan checks should submit raw non-encoded payloads to insertion points,
+     * and the insertion point has responsibility for performing any data
+     * encoding that is necessary given the nature and location of the insertion
+     * point.
      *
      * @param payload The payload that should be placed into the insertion
      * point.

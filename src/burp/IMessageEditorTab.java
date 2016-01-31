@@ -46,7 +46,8 @@ public interface IMessageEditorTab
      * message, so that the custom tab can indicate whether it should be enabled
      * for that message.
      *
-     * @param content The message that is about to be displayed.
+     * @param content The message that is about to be displayed, or a zero-length
+     * array if the existing message is to be cleared.
      * @param isRequest Indicates whether the message is a request or a
      * response.
      * @return The method should return

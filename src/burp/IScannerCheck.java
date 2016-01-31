@@ -20,17 +20,17 @@ import java.util.List;
  */
 public interface IScannerCheck
 {
+
     /**
      * The Scanner invokes this method for each base request / response that is
-     * passively scanned. <b>Note:</b> Extensions should not only analyze the
+     * passively scanned. <b>Note:</b> Extensions should only analyze the
      * HTTP messages provided during passive scanning, and should not make any
      * new HTTP requests of their own.
      *
      * @param baseRequestResponse The base HTTP request / response that should
      * be passively scanned.
-     * @return A list of
-     * <code>IScanIssue</code> objects, or
-     * <code>null</code> if no issues are identified.
+     * @return A list of <code>IScanIssue</code> objects, or <code>null</code>
+     * if no issues are identified.
      */
     List<IScanIssue> doPassiveScan(IHttpRequestResponse baseRequestResponse);
 
@@ -39,25 +39,20 @@ public interface IScannerCheck
      * scanned. Extensions may issue HTTP requests as required to carry out
      * active scanning, and should use the
      * <code>IScannerInsertionPoint</code> object provided to build scan
-     * requests for particular payloads. <b>Note:</b> Extensions are responsible
-     * for ensuring that attack payloads are suitably encoded within requests
-     * (for example, by URL-encoding relevant metacharacters in the URL query
-     * string). Encoding is not automatically carried out by the
-     * <code>IScannerInsertionPoint</code>, because this would prevent Scanner
-     * checks from testing for certain input filter bypasses. Extensions should
-     * query the
-     * <code>IScannerInsertionPoint</code> to determine its type, and apply any
-     * encoding that may be appropriate.
+     * requests for particular payloads.
+     * <b>Note:</b>
+     * Scan checks should submit raw non-encoded payloads to insertion points,
+     * and the insertion point has responsibility for performing any data
+     * encoding that is necessary given the nature and location of the insertion
+     * point.
      *
      * @param baseRequestResponse The base HTTP request / response that should
      * be actively scanned.
-     * @param insertionPoint An
-     * <code>IScannerInsertionPoint</code> object that can be queried to obtain
-     * details of the insertion point being tested, and can be used to build
-     * scan requests for particular payloads.
-     * @return A list of
-     * <code>IScanIssue</code> objects, or
-     * <code>null</code> if no issues are identified.
+     * @param insertionPoint An <code>IScannerInsertionPoint</code> object that
+     * can be queried to obtain details of the insertion point being tested, and
+     * can be used to build scan requests for particular payloads.
+     * @return A list of <code>IScanIssue</code> objects, or <code>null</code>
+     * if no issues are identified.
      */
     List<IScanIssue> doActiveScan(
             IHttpRequestResponse baseRequestResponse,
@@ -78,9 +73,8 @@ public interface IScannerCheck
      * @param newIssue An issue at the same URL path that has been newly
      * reported by this Scanner check.
      * @return An indication of which issue(s) should be reported in the main
-     * Scanner results. The method should return
-     * <code>-1</code> to report the existing issue only,
-     * <code>0</code> to report both issues, and
+     * Scanner results. The method should return <code>-1</code> to report the
+     * existing issue only, <code>0</code> to report both issues, and
      * <code>1</code> to report the new issue only.
      */
     int consolidateDuplicateIssues(

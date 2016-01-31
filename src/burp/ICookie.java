@@ -30,6 +30,14 @@ public interface ICookie
     String getDomain();
 
     /**
+     * This method is used to retrieve the path for which the cookie is in
+     * scope.
+     *
+     * @return The path for which the cookie is in scope or null if none is set.
+     */
+    String getPath();
+
+    /**
      * This method is used to retrieve the expiration time for the cookie.
      *
      * @return The expiration time for the cookie, or
