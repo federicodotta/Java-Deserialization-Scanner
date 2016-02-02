@@ -1,7 +1,7 @@
 package burp;
 
+import java.awt.Color;
 import java.awt.Component;
-import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.PrintWriter;
@@ -13,25 +13,28 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
-import javax.swing.JComboBox;
+import javax.swing.JEditorPane;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
-import javax.swing.JTable;
+import javax.swing.JTabbedPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter;
 import javax.swing.text.Highlighter.Highlight;
+import javax.swing.text.Highlighter.HighlightPainter;
 
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringEscapeUtils;
 
 public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionListener, IContextMenuFactory {
 	
@@ -64,11 +67,13 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     private JTextField host;
     private JTextField port;
     private JCheckBox useHttps;
-    private JTextArea resultArea;
+    private JEditorPane resultArea;
     private JCheckBox enableActiveScanChecks;
     //private JCheckBox aggressiveMode;
     private JCheckBox verboseMode;
     private JCheckBox addManualIssueToScannerResult;
+    private JButton attackButton;
+    private JButton attackBase64Button;
     
     private IHttpRequestResponse[] selectedItems;
     
@@ -147,7 +152,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 				  					   " resolveClass method, by inserting checks on the object type"+
 				  					   " before deserializing the received object.";  
         
-        stdout.println("Java Deserialization Scanner v0.2");
+        stdout.println("Java Deserialization Scanner v0.3");
         stdout.println("Created by: Federico Dotta");
         stdout.println("");
         stdout.println("Supported chains:");
@@ -182,7 +187,6 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                 JLabel portLabel = new JLabel("Port:");
                 port = new JTextField(5);
                 port.setMaximumSize( port.getPreferredSize() );
-                //JLabel useHttpsLabel = new JLabel("Https:");
                 useHttps = new JCheckBox("Https");
                 httpServicePanel.add(hostLabel);
                 httpServicePanel.add(host);
@@ -193,7 +197,8 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                 requestArea = new JTextArea();
                 JScrollPane scrollRequestArea = new JScrollPane(requestArea);
                 scrollRequestArea.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
-                
+                requestArea.setLineWrap(true);
+                                
                 JPanel buttonPanel = new JPanel();
                 buttonPanel.setLayout(new BoxLayout(buttonPanel, BoxLayout.X_AXIS));
                 
@@ -205,11 +210,11 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                 clearButton.setActionCommand("clear");
                 clearButton.addActionListener(BurpExtender.this); 
                 
-                JButton attackButton = new JButton("Attack");
+                attackButton = new JButton("Attack");
                 attackButton.setActionCommand("attack");
                 attackButton.addActionListener(BurpExtender.this);  
                 
-                JButton attackBase64Button = new JButton("Attack (Base64)");
+                attackBase64Button = new JButton("Attack (Base64)");
                 attackBase64Button.setActionCommand("attackBase64");
                 attackBase64Button.addActionListener(BurpExtender.this);  
                 
@@ -230,16 +235,16 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                 
                 JSplitPane rightSplitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
                 
-                resultArea = new JTextArea();
+                resultArea = new JEditorPane("text/html", "");
                 resultArea.setEditable(false);
-                resultArea.setText("Results:\n\n");
                 JScrollPane scrollResultArea = new JScrollPane(resultArea);
                 scrollResultArea.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
                 rightSplitPane.setTopComponent(scrollResultArea);
-                
+                                
+                JTabbedPane optionPane = new JTabbedPane();                
                 JPanel configurationPanel = new JPanel();
                 configurationPanel.setLayout(new BoxLayout(configurationPanel, BoxLayout.Y_AXIS));
-                JLabel configurationLabel = new JLabel("Plugin configurations:");
+                            
                 enableActiveScanChecks = new JCheckBox("Enable active scan checks");
                 enableActiveScanChecks.setSelected(true);
                 enableActiveScanChecks.setActionCommand("enableDisableActiveScanChecks");
@@ -248,12 +253,13 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                 verboseMode = new JCheckBox("Verbose mode");
                 addManualIssueToScannerResult = new JCheckBox("Add manual issues to scanner results");
                 addManualIssueToScannerResult.setSelected(true);
-                configurationPanel.add(configurationLabel);
                 configurationPanel.add(enableActiveScanChecks);
                 //configurationPanel.add(aggressiveMode);
                 configurationPanel.add(verboseMode);
                 configurationPanel.add(addManualIssueToScannerResult);
-                rightSplitPane.setBottomComponent(configurationPanel);
+                
+                optionPane.addTab("Configurations", configurationPanel);
+                rightSplitPane.setBottomComponent(optionPane);                
                 
                 rightSplitPane.setResizeWeight(0.85);
                 
@@ -534,16 +540,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 			    }
 			};
 			t.start();
-			
-			/*
-			try {
-				t.join();
-			} catch (InterruptedException e) {
-				
-				stderr.println(e.toString());
-			}
-			*/
-			
+						
 		} else if(command.equals("attackBase64")) {
 		
 			Thread t = new Thread() {
@@ -552,15 +549,6 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 			    }
 			};
 			t.start();
-			
-			/*
-			try {
-				t.join();
-			} catch (InterruptedException e) {
-				
-				stderr.println(e.toString());
-			}
-			*/
 		
 		} else if(command.equals("setInsertionPoint")) {
 			
@@ -600,6 +588,9 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 	public void clearInsertionPoint() {
 		
 		requestArea.setText(requestArea.getText().replace("§",""));
+		
+		Highlighter highlighter = requestArea.getHighlighter();
+		highlighter.removeAllHighlights();
 				
 	}
 	
@@ -623,10 +614,13 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 	
 	public void insertInjectionCharacters() {
 		
-		Highlight[] highlights = requestArea.getHighlighter().getHighlights();
+		Highlighter highlighter = requestArea.getHighlighter();
+		Highlight[] highlights = highlighter.getHighlights();
 		
 		int start = highlights[0].getStartOffset();
 		int end = highlights[0].getEndOffset();
+		
+		highlighter.removeAllHighlights();
 		
 		String requestString = requestArea.getText().trim();
 		
@@ -634,10 +628,22 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 		
 		requestArea.setText(newRequestString);
 		
+		HighlightPainter painter = new DefaultHighlighter.DefaultHighlightPainter(Color.pink);
+		
+		try {
+			highlighter.addHighlight(start, end+2, painter );
+		} catch (BadLocationException e) {
+			stderr.println("Error with the highlight of the insertion point");
+			stderr.println(e.toString());
+		}
+		
 	}
 	
 	
 	public void executeManualTest(boolean base64) {		
+		
+		attackButton.setEnabled(false);
+		attackBase64Button.setEnabled(false);
 		
 		String requestString = requestArea.getText().trim();
 		int payloadFrom = requestString.indexOf('§');
@@ -656,7 +662,11 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     		Iterator<String> iter = payloadKeys.iterator();
     		String currentKey;
     		
-    		resultArea.setText("Results:\n\n");
+    		String result = "<p><b>Results:</b></p>";
+    		result = result + "<ul>";
+    		    		
+    		resultArea.setText("<p><b>SCANNING IN PROGRESS</b></p>"
+    				+ "<p>Scanning can go on approximately from 1 second up to 60 seconds, based on the number of vulnerable libraries founded</p>");
     		
     		while (iter.hasNext()) {
 			
@@ -683,13 +693,13 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         		    			
         		long duration = TimeUnit.SECONDS.convert((endTime - startTime), TimeUnit.NANOSECONDS);
         		   
-        		resultArea.append("*** " + currentKey + ": ");       		
+        		result = result + "<li>" + currentKey + ": ";
         		
         		if(((int)duration) >= 10){
         			
         			positiveResult = true;
         			
-        			resultArea.append("Potentially VULNERABLE!!!\n");
+        			result = result + "<font color=\"red\"><b>Potentially VULNERABLE!!!</b></font>";
         			
         			if(addManualIssueToScannerResult.isSelected()) {
         				
@@ -710,35 +720,43 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         			
         		} else {
         			
-        			resultArea.append("NOT vulnerable!!!\n");
+        			result = result + "NOT vulnerable.";
         			
         		}
         		
+        		
         		if(verboseMode.isSelected()) {
-        			resultArea.append("Request:\n");
-        			resultArea.append(new String(requestResponse.getRequest()));
-        			resultArea.append("\n\nResponse:\n");
-        			resultArea.append(new String(requestResponse.getResponse()));
-        			resultArea.append("\n\n");
+        			result = result + "<br/><br/><b>Request:</b><br/>";
+        			result = result + "<pre>" + StringEscapeUtils.escapeHtml4(new String(requestResponse.getRequest())) + "</pre>";
+        			result = result + "<br/><br/><b>Response:</b><br/>";
+        			result = result + "<pre>" + StringEscapeUtils.escapeHtml4(new String(requestResponse.getResponse())) + "</pre>";
+        			result = result + "<br/><br/>";
         		}
+        		
+        		
+        		result = result + "</li>";
         		
     		}
     			
-    		resultArea.append("\nEND");
+    		result = result + "</ul><p><b>END</b></p>";
     		
     		if(positiveResult) {
     			
-    			resultArea.append("\n\n\nIMPORTANT NOTE: High delayed networks may produce false positives!");
+    			result = result + "<p><b>IMPORTANT NOTE: High delayed networks may produce false positives!</b></p>";
     			
     		}
     		
+    		resultArea.setText(result); 		
 
 			
 		} else {
 			
-			resultArea.setText("MISSING ENTRY POINTS");
+			resultArea.setText("<p><b>MISSING ENTRY POINTS</b></p>");
 			
 		}
+		
+		attackButton.setEnabled(true);
+		attackBase64Button.setEnabled(true);
 		
 	}
 
