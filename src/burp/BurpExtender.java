@@ -77,6 +77,8 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     
     private IHttpRequestResponse[] selectedItems;
     
+    private char insertionPointChar;
+    
         
     /*
      * TODO
@@ -151,6 +153,8 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 				  					   " ObjectInputStream default one. The custom object must override the "+
 				  					   " resolveClass method, by inserting checks on the object type"+
 				  					   " before deserializing the received object.";  
+        
+        insertionPointChar = (char)167;        
         
         stdout.println("Java Deserialization Scanner v0.3");
         stdout.println("Created by: Federico Dotta");
@@ -587,7 +591,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 	
 	public void clearInsertionPoint() {
 		
-		requestArea.setText(requestArea.getText().replace("§",""));
+		requestArea.setText(requestArea.getText().replace(""+insertionPointChar,""));
 		
 		Highlighter highlighter = requestArea.getHighlighter();
 		highlighter.removeAllHighlights();
@@ -624,7 +628,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 		
 		String requestString = requestArea.getText().trim();
 		
-		String newRequestString = requestString.substring(0, start) + "§" + requestString.substring(start, end) + "§" + requestString.substring(end, requestString.length());
+		String newRequestString = requestString.substring(0, start) + insertionPointChar + requestString.substring(start, end) + insertionPointChar + requestString.substring(end, requestString.length());
 		
 		requestArea.setText(newRequestString);
 		
@@ -646,8 +650,8 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 		attackBase64Button.setEnabled(false);
 		
 		String requestString = requestArea.getText().trim();
-		int payloadFrom = requestString.indexOf('§');
-		int payloadTo = requestString.lastIndexOf('§');
+		int payloadFrom = requestString.indexOf(insertionPointChar);
+		int payloadTo = requestString.lastIndexOf(insertionPointChar);
 		
 		boolean positiveResult = false;
 		
