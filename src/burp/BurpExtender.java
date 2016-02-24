@@ -614,6 +614,10 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 		
 		requestArea.setText(new String(request));
 		
+		// Clear old highlighter
+		Highlighter highlighter = requestArea.getHighlighter();
+		highlighter.removeAllHighlights();
+		
 	}
 	
 	public void insertInjectionCharacters() {
