@@ -332,7 +332,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 
     @Override
     public List<IScanIssue> doActiveScan(IHttpRequestResponse baseRequestResponse, IScannerInsertionPoint insertionPoint) {
- 	
+    	    	
     	List<IScanIssue> issues = new ArrayList<IScanIssue>();
     	
     	// Full body insertion point
@@ -342,7 +342,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     	int magicPos = helpers.indexOf(request, serializeMagic, false, 0, request.length);
     	int magicPosBase64 = helpers.indexOf(request, base64Magic, false, 0, request.length);
     	
-    	if(magicPos > -1 || magicPosBase64 > -1) {
+    	if((magicPos > -1 && magicPos >= bodyOffset) || (magicPosBase64 > -1 && magicPosBase64 >= bodyOffset)) {
     		
     		List<String> headers = requestInfo.getHeaders();
     		
@@ -356,7 +356,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         		byte[] newBody = null; 
         		if(magicPos > -1)	 {	
         			// Put directly the payload
-        			newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPos),payloads.get(currentKey));
+        			newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPos),payloads.get(currentKey));     			
         		} else {
         			// Encode the payload in Base64
         			newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPosBase64),Base64.encodeBase64URLSafe(payloads.get(currentKey)));
@@ -630,8 +630,8 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 		
 		highlighter.removeAllHighlights();
 		
-		String requestString = requestArea.getText().trim();
-		
+		String requestString = requestArea.getText();
+
 		String newRequestString = requestString.substring(0, start) + insertionPointChar + requestString.substring(start, end) + insertionPointChar + requestString.substring(end, requestString.length());
 		
 		requestArea.setText(newRequestString);
@@ -653,18 +653,18 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 		attackButton.setEnabled(false);
 		attackBase64Button.setEnabled(false);
 		
-		String requestString = requestArea.getText().trim();
+		String requestString = requestArea.getText();
 		int payloadFrom = requestString.indexOf(insertionPointChar);
 		int payloadTo = requestString.lastIndexOf(insertionPointChar);
-		
+						
 		boolean positiveResult = false;
 		
 		if(payloadFrom != payloadTo) {
 			
 			IHttpService httpService = helpers.buildHttpService(host.getText().trim(), Integer.parseInt(port.getText().trim()), useHttps.isSelected());
-			
-			byte[] prePayloadRequest =  Arrays.copyOfRange(requestString.getBytes(), 0, payloadFrom);
-			byte[] postPayloadRequest = Arrays.copyOfRange(requestString.getBytes(), payloadTo+1, requestString.getBytes().length);
+
+			byte[] prePayloadRequest =  requestString.substring(0, payloadFrom).getBytes();
+			byte[] postPayloadRequest = requestString.substring(payloadTo+1,requestString.length()).getBytes();
 			
 			Set<String> payloadKeys = payloads.keySet();
     		Iterator<String> iter = payloadKeys.iterator();
