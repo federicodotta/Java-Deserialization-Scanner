@@ -43,6 +43,7 @@ import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringEscapeUtils;
+import org.apache.commons.codec.binary.Hex;
 
 public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionListener, IContextMenuFactory,IMessageEditorController {
 	
@@ -54,6 +55,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     
     private byte[] serializeMagic = new byte[]{-84, -19};
     private byte[] base64Magic = {(byte)0x72, (byte)0x4f, (byte)0x30, (byte)0x41};
+    private byte[] asciiHexMagic = {(byte)0x61, (byte)0x63, (byte)0x65, (byte)0x64};
     
     private HashMap<String,byte[]> payloads;
     
@@ -82,6 +84,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     private JCheckBox addManualIssueToScannerResultManualTesting;
     private JButton attackButtonManualTesting;
     private JButton attackBase64ButtonManualTesting;
+    private JButton attackAsciiHexButtonManualTesting;
     
     private JPanel mainPanelExploiting;
     private JSplitPane splitPaneExploiting;
@@ -94,6 +97,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     private IMessageEditor resultAreaExploitingTopResponse;
     private JButton attackButtonExploiting;
     private JButton attackBase64ButtonExploiting;  
+    private JButton attackAsciiHexButtonExploiting;
     private JTextArea resultAreaExploitingBottom;
         
     private JPanel mainPanelConfiguration;
@@ -109,6 +113,10 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     
     private IHttpRequestResponse currentExploitationRequestResponse;
     
+    static final int TYPE_RAW = 0;
+    static final int TYPE_BASE64 = 1;
+    static final int TYPE_ASCII_HEX = 2;
+    
         
     /*
      * TODO
@@ -118,7 +126,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
      * on its base value (Aggressive mode).
      * - Maybe search also in headers (I don't know if Burp set all headers as insertion
      * points...)
-     * - Ad insert as ASCII HEX
+     * - Add "send to Repeater" and "send to Exploiting" in plugin tabs
      */    
     
     @Override
@@ -196,6 +204,11 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         stdout.println("Spring");
         stdout.println("Java 6 and Java 7 (<= jdk7u21)");
         stdout.println("");
+        stdout.println("Supported encodings:");
+        stdout.println("RAW");
+        stdout.println("Base64");
+        stdout.println("Ascii HEX");
+        stdout.println("");
         stdout.println("Github: https://github.com/federicodotta/Java-Deserialization-Scanner");
         stdout.println("");
         
@@ -257,10 +270,15 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                 attackBase64ButtonManualTesting.setActionCommand("attackBase64");
                 attackBase64ButtonManualTesting.addActionListener(BurpExtender.this);  
                 
+                attackAsciiHexButtonManualTesting = new JButton("Attack (Ascii Hex)");
+                attackAsciiHexButtonManualTesting.setActionCommand("attackAsciiHex");
+                attackAsciiHexButtonManualTesting.addActionListener(BurpExtender.this);
+                                
                 buttonPanelManualTesting.add(setInsertionPointButtonManualTesting);
                 buttonPanelManualTesting.add(clearButtonManualTesting);
                 buttonPanelManualTesting.add(attackButtonManualTesting);
                 buttonPanelManualTesting.add(attackBase64ButtonManualTesting);
+                buttonPanelManualTesting.add(attackAsciiHexButtonManualTesting);
                 
                 leftPanelManualTesting.add(httpServicePanelManualTesting);
                 leftPanelManualTesting.add(scrollRequestAreaManualTesting);
@@ -366,10 +384,15 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                 
                 attackBase64ButtonExploiting = new JButton("Attack Base64");
                 attackBase64ButtonExploiting.setActionCommand("attackBase64Exploitation");
-                attackBase64ButtonExploiting.addActionListener(BurpExtender.this);   
+                attackBase64ButtonExploiting.addActionListener(BurpExtender.this);  
+                
+                attackAsciiHexButtonExploiting = new JButton("Attack Ascii HEX");
+                attackAsciiHexButtonExploiting.setActionCommand("attackAsciiHexButtonExploiting");
+                attackAsciiHexButtonExploiting.addActionListener(BurpExtender.this);                   
                 
                 buttonPanelExploitingBottom.add(attackButtonExploiting);
                 buttonPanelExploitingBottom.add(attackBase64ButtonExploiting);
+                buttonPanelExploitingBottom.add(attackAsciiHexButtonExploiting);
                 
                 leftBottomPanelExploiting.add(labelExploitingBottom);
                 leftBottomPanelExploiting.add(scrollRequestAreaExploitingBottom);
@@ -522,27 +545,33 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     	//IRequestInfo requestInfo = helpers.analyzeRequest(request);
     	int magicPos = helpers.indexOf(request, serializeMagic, false, 0, request.length);
     	int magicPosBase64 = helpers.indexOf(request, base64Magic, false, 0, request.length);
+    	int magicPosAsciiHex = helpers.indexOf(request, asciiHexMagic, false, 0, request.length);
     	
-    	if(magicPos > -1 || magicPosBase64 > -1) {
+    	if(magicPos > -1 || magicPosBase64 > -1 || magicPosAsciiHex > -1) {
     		
     		// Adding of marker for the vulnerability report
 			List<int[]> requestMarkers = new ArrayList<int[]>();
+			String issueName = "";
 			if(magicPos > -1) {
 				requestMarkers.add(new int[]{magicPos,request.length});
-			} else {
+				issueName = passiveScanIssue;
+			} else if(magicPosBase64 > -1) {
 				requestMarkers.add(new int[]{magicPosBase64,request.length});
+				issueName = passiveScanIssue + " (encoded in Base64)";
+			} else {
+				requestMarkers.add(new int[]{magicPosAsciiHex,request.length});
+				issueName = passiveScanIssue + " (encoded in Ascii HEX)";
 			}
-			
+						
             issues.add(new CustomScanIssue(
                     baseRequestResponse.getHttpService(),
                     helpers.analyzeRequest(baseRequestResponse).getUrl(), 
                     new IHttpRequestResponse[] { callbacks.applyMarkers(baseRequestResponse, requestMarkers, new ArrayList<int[]>()) }, 
-                    (magicPosBase64 > -1) ? (passiveScanIssue + " (encoded in Base64)") : (passiveScanIssue),
+                    issueName,
                     passiveScanSeverity,
                     passiveScanConfidence,
                     passiveScanIssueDetail,
                     passiveScanRemediationDetail));
-
             
     	}
     	
@@ -566,8 +595,9 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     	int bodyOffset = requestInfo.getBodyOffset();
     	int magicPos = helpers.indexOf(request, serializeMagic, false, 0, request.length);
     	int magicPosBase64 = helpers.indexOf(request, base64Magic, false, 0, request.length);
+    	int magicPosAsciiHex = helpers.indexOf(request, asciiHexMagic, false, 0, request.length);
     	
-    	if((magicPos > -1 && magicPos >= bodyOffset) || (magicPosBase64 > -1 && magicPosBase64 >= bodyOffset)) {
+    	if((magicPos > -1 && magicPos >= bodyOffset) || (magicPosBase64 > -1 && magicPosBase64 >= bodyOffset) || (magicPosAsciiHex > -1 && magicPosAsciiHex >= bodyOffset)) {
     		
     		List<String> headers = requestInfo.getHeaders();
     		
@@ -582,9 +612,12 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         		if(magicPos > -1)	 {	
         			// Put directly the payload
         			newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPos),payloads.get(currentKey));     			
-        		} else {
+        		} else if(magicPosBase64 > -1) {
         			// Encode the payload in Base64
         			newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPosBase64),Base64.encodeBase64URLSafe(payloads.get(currentKey)));
+        		} else {
+        			// Encode the payload in Ascii HEX
+        			newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPosAsciiHex),Hex.encodeHexString(payloads.get(currentKey)).getBytes());
         		}
         		byte[] newRequest = helpers.buildHttpMessage(headers, newBody);
         		
@@ -600,10 +633,16 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         			List<int[]> requestMarkers = new ArrayList<int[]>();
         			
         	    	int markerStartPos = 0;
+        	    	String issueName = "";
         	    	if(magicPos > -1) {
         	    		markerStartPos = helpers.indexOf(newRequest, serializeMagic, false, 0, newRequest.length);
-        			} else {
+        	    		issueName = activeScanIssue + currentKey;
+        			} else if(magicPosBase64 > -1) {
         				markerStartPos = helpers.indexOf(newRequest, base64Magic, false, 0, newRequest.length);
+        				issueName = activeScanIssue + currentKey + " (encoded in Base64)";
+        			} else {
+        				markerStartPos = helpers.indexOf(newRequest, asciiHexMagic, false, 0, newRequest.length);
+        				issueName = activeScanIssue + currentKey + " (encoded in Ascii HEX)";
         			}
         	    	requestMarkers.add(new int[]{markerStartPos,newRequest.length});
         	    	
@@ -611,7 +650,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                             baseRequestResponse.getHttpService(),
                             helpers.analyzeRequest(baseRequestResponse).getUrl(), 
                             new IHttpRequestResponse[] { callbacks.applyMarkers(checkRequestResponse, requestMarkers, new ArrayList<int[]>()) }, 
-                            (magicPosBase64 > -1) ? (activeScanIssue + currentKey + " (encoded in Base64)") : (activeScanIssue + currentKey),
+                            issueName,
                             activeScanSeverity,
                             activeScanConfidence,
                             activeScanIssueDetail + currentKey + ".",
@@ -623,13 +662,13 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     		
 		}
     	    	
-    	
     	// Current insertion point
     	byte[] insertionPointBaseValue = insertionPoint.getBaseValue().getBytes();
 		magicPos = helpers.indexOf(insertionPointBaseValue, serializeMagic, false, 0, insertionPointBaseValue.length);
 		magicPosBase64 = helpers.indexOf(insertionPointBaseValue, base64Magic, false, 0, insertionPointBaseValue.length);
+		magicPosAsciiHex = helpers.indexOf(insertionPointBaseValue, asciiHexMagic, false, 0, insertionPointBaseValue.length);
 		
-		if(magicPos > -1 || magicPosBase64 > -1) {
+		if(magicPos > -1 || magicPosBase64 > -1 || magicPosAsciiHex > -1) {
     		
     		Set<String> payloadKeys = payloads.keySet();
     		Iterator<String> iter = payloadKeys.iterator();
@@ -640,8 +679,10 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         		
         		if(magicPos > -1) {
         			newPayload = ArrayUtils.addAll(Arrays.copyOfRange(insertionPointBaseValue, 0, magicPos),payloads.get(currentKey));
-        		} else {
+        		} else if(magicPosBase64 > -1) {
         			newPayload = ArrayUtils.addAll(Arrays.copyOfRange(insertionPointBaseValue, 0, magicPosBase64),Base64.encodeBase64URLSafe(payloads.get(currentKey)));
+        		} else {
+        			newPayload = ArrayUtils.addAll(Arrays.copyOfRange(insertionPointBaseValue, 0, magicPosAsciiHex),Hex.encodeHexString(payloads.get(currentKey)).getBytes());
         		}
         		
         		byte[] newRequest = insertionPoint.buildRequest(newPayload);
@@ -659,13 +700,20 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         			List<int[]> requestMarkers = new ArrayList<int[]>();
         			int markerStart = 0;
         			int markerEnd = 0;
+        			String issueName = "";
         			
-        			if(magicPosBase64 > -1) {
-        				markerStart = helpers.indexOf(newRequest, Base64.encodeBase64URLSafe(payloads.get(currentKey)), false, 0, newRequest.length);
-        				markerEnd = markerStart + helpers.urlEncode(Base64.encodeBase64URLSafe(payloads.get(currentKey))).length;
-        			} else {
+        			if(magicPos > -1) {
         				markerStart =  helpers.indexOf(newRequest, helpers.urlEncode(payloads.get(currentKey)), false, 0, newRequest.length);
         				markerEnd = markerStart + helpers.urlEncode(payloads.get(currentKey)).length;
+        				issueName = activeScanIssue + currentKey;
+        			}else if(magicPosBase64 > -1) {
+        				markerStart = helpers.indexOf(newRequest, Base64.encodeBase64URLSafe(payloads.get(currentKey)), false, 0, newRequest.length);
+        				markerEnd = markerStart + helpers.urlEncode(Base64.encodeBase64URLSafe(payloads.get(currentKey))).length;
+        				issueName = activeScanIssue + currentKey + " (encoded in Base64)";
+        			} else {
+        				markerStart = helpers.indexOf(newRequest, Hex.encodeHexString(payloads.get(currentKey)).getBytes(), false, 0, newRequest.length);
+        				markerEnd = markerStart + helpers.urlEncode(Hex.encodeHexString(payloads.get(currentKey)).getBytes()).length;
+        				issueName = activeScanIssue + currentKey + " (encoded in Ascii HEX)";
         			}       			
         			
         			requestMarkers.add(new int[]{markerStart,markerEnd});
@@ -674,7 +722,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                             baseRequestResponse.getHttpService(),
                             helpers.analyzeRequest(baseRequestResponse).getUrl(), 
                             new IHttpRequestResponse[] { callbacks.applyMarkers(checkRequestResponse, requestMarkers, new ArrayList<int[]>()) }, 
-                            (magicPosBase64 > -1) ? (activeScanIssue + currentKey + " (encoded in Base64)") : (activeScanIssue + currentKey),
+                            issueName,
                             activeScanSeverity,
                             activeScanConfidence,
                             activeScanIssueDetail + currentKey + ".",
@@ -703,6 +751,12 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         	int existingMagicPos = helpers.indexOf(existingRequestResponse, serializeMagic, false, 0, existingRequestResponse.length);
         	int newMagicPos = helpers.indexOf(newRequestResponse, serializeMagic, false, 0, newRequestResponse.length);
         	
+    		int existingMagicPosBase64 = helpers.indexOf(existingRequestResponse, base64Magic, false, 0, existingRequestResponse.length);
+    		int newMagicPosBase64 = helpers.indexOf(newRequestResponse, base64Magic, false, 0, newRequestResponse.length);
+    		
+    		int existingMagicPosAsciiHex = helpers.indexOf(existingRequestResponse, asciiHexMagic, false, 0, existingRequestResponse.length);
+    		int newMagicPosAsciiHex = helpers.indexOf(newRequestResponse, asciiHexMagic, false, 0, newRequestResponse.length);
+        	
         	if((existingMagicPos > -1) && (newMagicPos > -1)) {
         		        		
             	if(existingMagicPos == newMagicPos) {
@@ -716,11 +770,8 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
             	
             	}        		
         		
-        	} else {
+        	} else if((existingMagicPosBase64 > -1) && (newMagicPosBase64 > -1)) {
         		
-        		int existingMagicPosBase64 = helpers.indexOf(existingRequestResponse, base64Magic, false, 0, existingRequestResponse.length);
-        		int newMagicPosBase64 = helpers.indexOf(newRequestResponse, base64Magic, false, 0, newRequestResponse.length);
-
         		if(existingMagicPosBase64 == newMagicPosBase64) {
                 	
     	        	//stdout.println("Consolidate duplicate issue");	        	
@@ -732,6 +783,18 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
             	
             	}  
         		
+        	} else {
+        		
+        		if(existingMagicPosAsciiHex == newMagicPosAsciiHex) {
+                	
+    	        	//stdout.println("Consolidate duplicate issue");	        	
+    	        	return -1;
+    	        
+            	} else {
+            	
+            		return 0;
+            	
+            	}  
         	}
 
         } else { 
@@ -765,7 +828,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 			
 			Thread t = new Thread() {
 			    public void run() {
-			    	executeManualTest(false);
+			    	executeManualTest(BurpExtender.TYPE_RAW);
 			    }
 			};
 			t.start();
@@ -774,7 +837,16 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 		
 			Thread t = new Thread() {
 			    public void run() {
-			    	executeManualTest(true);
+			    	executeManualTest(BurpExtender.TYPE_BASE64);
+			    }
+			};
+			t.start();
+		
+		} else if(command.equals("attackAsciiHex")) {
+		
+			Thread t = new Thread() {
+			    public void run() {
+			    	executeManualTest(BurpExtender.TYPE_ASCII_HEX);
 			    }
 			};
 			t.start();
@@ -811,7 +883,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 						
 			Thread t = new Thread() {
 			    public void run() {
-			    	attackExploitation(false);
+			    	attackExploitation(BurpExtender.TYPE_RAW);
 			    }
 			};
 			t.start();			
@@ -821,12 +893,24 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 			
 			Thread t = new Thread() {
 			    public void run() {
-			    	attackExploitation(true);
+			    	attackExploitation(BurpExtender.TYPE_BASE64);
+			    }
+			};
+			t.start();		
+			
+		} else if(command.equals("attackAsciiHexButtonExploiting")) {
+			
+			Thread t = new Thread() {
+			    public void run() {
+			    	attackExploitation(BurpExtender.TYPE_ASCII_HEX);
 			    }
 			};
 			t.start();		
 			
 		}
+		
+		
+		
 		
 	}	
 	
@@ -942,10 +1026,11 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 		
 	}
 	
-	public void attackExploitation(boolean base64) {		
+	public void attackExploitation(int encoding) {		
 		
 		attackButtonExploiting.setEnabled(false);
 		attackBase64ButtonExploiting.setEnabled(false);
+		attackAsciiHexButtonExploiting.setEnabled(false);
 		
 		String requestString = requestAreaExploitingTop.getText();
 		int payloadFrom = requestString.indexOf(insertionPointChar);
@@ -964,10 +1049,12 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 				
 				byte[] request;
     			
-    			if(!base64) {
+    			if(encoding == BurpExtender.TYPE_RAW) {
     				request = ArrayUtils.addAll(prePayloadRequest,payloadYSoSerial);
-    			} else {
+    			} else if(encoding == BurpExtender.TYPE_BASE64) {
     				request = ArrayUtils.addAll(prePayloadRequest,Base64.encodeBase64URLSafe(payloadYSoSerial));
+    			} else {
+    				request = ArrayUtils.addAll(prePayloadRequest,Hex.encodeHexString(payloadYSoSerial).getBytes());
     			}
 				
     			request = ArrayUtils.addAll(request,postPayloadRequest);
@@ -999,21 +1086,23 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 			
 		} else {
 			
-			resultAreaExploitingTopRequest.setMessage("MISSING ENTRY POINTSS".getBytes(), true);
+			resultAreaExploitingTopRequest.setMessage("MISSING ENTRY POINTS".getBytes(), true);
 			resultAreaExploitingTopResponse.setMessage("MISSING ENTRY POINTS".getBytes(), false);
 			
 		}
 		
 		attackButtonExploiting.setEnabled(true);
 		attackBase64ButtonExploiting.setEnabled(true);
+		attackAsciiHexButtonExploiting.setEnabled(false);
 		
 	}	
 	
 	
-	public void executeManualTest(boolean base64) {		
+	public void executeManualTest(int encoding) {		
 		
 		attackButtonManualTesting.setEnabled(false);
 		attackBase64ButtonManualTesting.setEnabled(false);
+		attackAsciiHexButtonManualTesting.setEnabled(false);
 		
 		String requestString = requestAreaManualTesting.getText();
 		int payloadFrom = requestString.indexOf(insertionPointChar);
@@ -1044,10 +1133,12 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     			
     			byte[] request;
     			
-    			if(!base64) {
+    			if(encoding == BurpExtender.TYPE_RAW) {
     				request = ArrayUtils.addAll(prePayloadRequest,payloads.get(currentKey));
-    			} else {
+    			} else if(encoding == BurpExtender.TYPE_BASE64) {
     				request = ArrayUtils.addAll(prePayloadRequest,Base64.encodeBase64URLSafe(payloads.get(currentKey)));
+    			} else {
+    				request = ArrayUtils.addAll(prePayloadRequest,Hex.encodeHexString(payloads.get(currentKey)).getBytes());
     			}
     			
     			request = ArrayUtils.addAll(request,postPayloadRequest);
@@ -1076,11 +1167,21 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         				List<int[]> requestMarkers = new ArrayList<int[]>();
         				requestMarkers.add(new int[] {payloadFrom,requestResponse.getRequest().length - postPayloadRequest.length});
         				
+        				String issueName = "";
+        				if(encoding == BurpExtender.TYPE_RAW) {
+        					issueName = activeScanIssue + currentKey;
+        				} else if(encoding == BurpExtender.TYPE_BASE64) {
+        					issueName = activeScanIssue + currentKey + " (encoded in Base64)";
+        				} else {
+        					issueName = activeScanIssue + currentKey + " (encoded in Ascii HEX)";
+        				}
+        				
+        				
         				callbacks.addScanIssue(new CustomScanIssue(
         						requestResponse.getHttpService(),
                                 helpers.analyzeRequest(requestResponse).getUrl(), 
                                 new IHttpRequestResponse[] { callbacks.applyMarkers(requestResponse, requestMarkers, new ArrayList<int[]>()) }, 
-                                (base64) ? (activeScanIssue + currentKey + " (encoded in Base64)") : (activeScanIssue + currentKey),
+                                issueName,
                                 activeScanSeverity,
                                 activeScanConfidence,
                                 activeScanIssueDetail + currentKey + ".",
@@ -1127,6 +1228,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 		
 		attackButtonManualTesting.setEnabled(true);
 		attackBase64ButtonManualTesting.setEnabled(true);
+		attackAsciiHexButtonManualTesting.setEnabled(true);
 		
 	}
 
