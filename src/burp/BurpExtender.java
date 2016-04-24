@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.StringTokenizer;
 import java.util.concurrent.TimeUnit;
 
 import javax.swing.BoxLayout;
@@ -26,6 +27,7 @@ import javax.swing.JEditorPane;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JSeparator;
 import javax.swing.JSplitPane;
@@ -250,6 +252,19 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                 JScrollPane scrollRequestAreaManualTesting = new JScrollPane(requestAreaManualTesting);
                 scrollRequestAreaManualTesting.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
                 requestAreaManualTesting.setLineWrap(true);
+                
+                // MENU
+                JPopupMenu popupMenuManualTesting = new JPopupMenu();
+                JMenuItem sendToRepeaterManualTesting = new JMenuItem("Send to Repeater");
+                sendToRepeaterManualTesting.setActionCommand("sendRepeaterManualTesting");
+                sendToRepeaterManualTesting.addActionListener(BurpExtender.this);
+                popupMenuManualTesting.add(sendToRepeaterManualTesting);
+                JMenuItem sendToExploitingManualTesting = new JMenuItem("Send to Exploitation tab");
+                sendToExploitingManualTesting.setActionCommand("sendExploitingManualTesting");
+                sendToExploitingManualTesting.addActionListener(BurpExtender.this);
+                popupMenuManualTesting.add(sendToExploitingManualTesting);
+                requestAreaManualTesting.setComponentPopupMenu(popupMenuManualTesting);                
+                // END MENU
                                 
                 JPanel buttonPanelManualTesting = new JPanel();
                 buttonPanelManualTesting.setLayout(new BoxLayout(buttonPanelManualTesting, BoxLayout.X_AXIS));
@@ -339,6 +354,19 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                 JScrollPane scrollRequestAreaExploiting = new JScrollPane(requestAreaExploitingTop);
                 scrollRequestAreaExploiting.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
                 requestAreaExploitingTop.setLineWrap(true);
+                
+                // MENU
+                JPopupMenu popupMenuExploiting = new JPopupMenu();
+                JMenuItem sendToRepeaterExploiting = new JMenuItem("Send to Repeater");
+                sendToRepeaterExploiting.setActionCommand("sendRepeaterExploiting");
+                sendToRepeaterExploiting.addActionListener(BurpExtender.this);
+                popupMenuExploiting.add(sendToRepeaterExploiting);
+                JMenuItem sendToManualTestingExploiting = new JMenuItem("Send to Manual Testing tab");
+                sendToManualTestingExploiting.setActionCommand("sendManualTestingExploiting");
+                sendToManualTestingExploiting.addActionListener(BurpExtender.this);
+                popupMenuExploiting.add(sendToManualTestingExploiting);
+                requestAreaExploitingTop.setComponentPopupMenu(popupMenuExploiting);                
+                // END MENU
                                 
                 JPanel buttonPanelExploiting = new JPanel();
                 buttonPanelExploiting.setLayout(new BoxLayout(buttonPanelExploiting, BoxLayout.X_AXIS));
@@ -907,10 +935,54 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 			};
 			t.start();		
 			
-		}
-		
-		
-		
+		} else if(command.equals("sendRepeaterManualTesting")) {
+			
+			callbacks.sendToRepeater(hostManualTesting.getText().trim(), Integer.parseInt(portManualTesting.getText().trim()), useHttpsManualTesting.isSelected(), requestAreaManualTesting.getText().getBytes(), null);
+						
+		} else if(command.equals("sendExploitingManualTesting")) {
+			
+			SwingUtilities.invokeLater(new Runnable() {
+				
+	            @Override
+	            public void run() {
+			
+					hostExploiting.setText(hostManualTesting.getText().trim());
+					portExploiting.setText(portManualTesting.getText().trim());
+					if(useHttpsManualTesting.isSelected()) {
+						useHttpsExploiting.setSelected(true);
+					} else {
+						useHttpsExploiting.setSelected(false);
+					}
+					requestAreaExploitingTop.setText(requestAreaManualTesting.getText());
+					
+	            }
+			});
+					
+		} else if(command.equals("sendRepeaterExploiting")) {
+			
+			callbacks.sendToRepeater(hostExploiting.getText().trim(), Integer.parseInt(portExploiting.getText().trim()), useHttpsExploiting.isSelected(), requestAreaExploitingTop.getText().getBytes(), null);
+						
+		} else if(command.equals("sendManualTestingExploiting")) {
+			
+			SwingUtilities.invokeLater(new Runnable() {
+				
+	            @Override
+	            public void run() {
+	            	
+	            	hostManualTesting.setText(hostExploiting.getText().trim());
+	            	portManualTesting.setText(portExploiting.getText().trim());
+					if(useHttpsExploiting.isSelected()) {
+						useHttpsManualTesting.setSelected(true);
+					} else {
+						useHttpsManualTesting.setSelected(false);
+					}
+					requestAreaManualTesting.setText(requestAreaExploitingTop.getText());
+			
+	            }
+			});
+					
+		} 
+			
 		
 	}	
 	
@@ -992,7 +1064,9 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 		
 		try {
 			
-			String[] commandParts = requestAreaExploitingBottom.getText().trim().split(" ");
+			String[] commandParts = translateCommandline(requestAreaExploitingBottom.getText().trim());
+			for(int i=0;i<commandParts.length;i++)
+				stdout.println(commandParts[i]);
 			
 			Runtime rt = Runtime.getRuntime();
 			String[] commands = {"java","-jar",pathYsoserial};
@@ -1093,7 +1167,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 		
 		attackButtonExploiting.setEnabled(true);
 		attackBase64ButtonExploiting.setEnabled(true);
-		attackAsciiHexButtonExploiting.setEnabled(false);
+		attackAsciiHexButtonExploiting.setEnabled(true);
 		
 	}	
 	
@@ -1271,6 +1345,70 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 	public byte[] getResponse() {
 		return currentExploitationRequestResponse.getResponse();
 	}
+	
+	public static String[] translateCommandline(String toProcess) {
+        if(toProcess != null && toProcess.length() != 0) {
+            boolean normal = false;
+            boolean inQuote = true;
+            boolean inDoubleQuote = true;
+            byte state = 0;
+            StringTokenizer tok = new StringTokenizer(toProcess, "\"\' ", true);
+            ArrayList result = new ArrayList();
+            StringBuilder current = new StringBuilder();
+            boolean lastTokenHasBeenQuoted = false;
+
+            while(true) {
+                while(tok.hasMoreTokens()) {
+                    String nextTok = tok.nextToken();
+                    switch(state) {
+                    case 1:
+                        if("\'".equals(nextTok)) {
+                            lastTokenHasBeenQuoted = true;
+                            state = 0;
+                        } else {
+                            current.append(nextTok);
+                        }
+                        continue;
+                    case 2:
+                        if("\"".equals(nextTok)) {
+                            lastTokenHasBeenQuoted = true;
+                            state = 0;
+                        } else {
+                            current.append(nextTok);
+                        }
+                        continue;
+                    }
+
+                    if("\'".equals(nextTok)) {
+                        state = 1;
+                    } else if("\"".equals(nextTok)) {
+                        state = 2;
+                    } else if(" ".equals(nextTok)) {
+                        if(lastTokenHasBeenQuoted || current.length() != 0) {
+                            result.add(current.toString());
+                            current.setLength(0);
+                        }
+                    } else {
+                        current.append(nextTok);
+                    }
+
+                    lastTokenHasBeenQuoted = false;
+                }
+
+                if(lastTokenHasBeenQuoted || current.length() != 0) {
+                    result.add(current.toString());
+                }
+
+                if(state != 1 && state != 2) {
+                    return (String[])result.toArray(new String[result.size()]);
+                }
+
+                throw new RuntimeException("unbalanced quotes in " + toProcess);
+            }
+        } else {
+            return new String[0];
+        }
+    }
 
  	
 }
