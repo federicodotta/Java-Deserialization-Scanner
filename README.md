@@ -10,7 +10,7 @@ The plugin is made up of three different components:
 # Author
 - Federico Dotta, Security Expert at @ Mediaservice.net
 
-# 1 - Integration with Burp Suite active and passive scanner
+# Integration with Burp Suite active and passive scanner
 Java Deserialization Scanner uses custom payloads generated with a modified version of "ysoserial", tool created by frohoff and gebl, to detect Java deserialization vulnerabilities. The original tool (https://github.com/frohoff/ysoserial) generate payloads for the execution of commands on the system, using the Runtime.exec function. Usually, however, it is not possible to see the output of the command and consequently it is not simple to write a scanner based on this kind of function. The modified version adds the generation of payloads that execute a syncronous sleep function, very useful to check for the presence of the Java deserialization issues in an automated way.
 
 Currently, the passive checks of the Java Deserialiation Scanner reported the presence of serialized Java objects in the HTTP requests (in raw format or encoded in Base64 or in Ascii Hex) and the active checks actively scan for the presence of weak deserialization functions in conjuction with the presence of the following weak libraries:
@@ -25,10 +25,10 @@ Currently, the passive checks of the Java Deserialiation Scanner reported the pr
 
 In the test folder there are some simple Java server applications that can be used to test the plugin. Every application employ a different vulnerable Java library.
 
-# 2 - Manual tester
+# Manual tester
 The plugin offer a dedicated tab to launch the detection with the sleep payloads on custom insertion points, in order to check the Java deserialization vulnerabilities in particular situations in which strange entry points do not allow the detection with the scanner. The results of the manual tester can be inserted between Burp Suite scanner results.
 
-# 3 - Exploiter
+# Exploiter
 After that a Java deserialization vulnerability has been found, it is possible to actively exploit the issue with the Exploiting dedicated tab. The plugin allow to configure the path of frohoff ysoserial and use this tool to generate the exploitation payloads. The exploiter, as the other components, supports three different encodings for the payloads: raw, Base64 or Ascii Hex.
 
 # Screenshot
