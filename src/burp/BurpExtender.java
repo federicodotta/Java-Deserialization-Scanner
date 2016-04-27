@@ -1209,7 +1209,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     		result = result + "<ul>";
     		    		
     		resultAreaManualTesting.setText("<p><b>SCANNING IN PROGRESS</b></p>"
-    				+ "<p>Scanning can go on approximately from 1 second up to 60 seconds, based on the number of vulnerable libraries founded</p>");
+    				+ "<p>Scanning can go on approximately from 1 second up to 3 minutes, based on the number of vulnerable libraries founded</p>");
     		
     		while (iter.hasNext()) {
 			
