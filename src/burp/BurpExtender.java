@@ -59,6 +59,10 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     private byte[] base64Magic = {(byte)0x72, (byte)0x4f, (byte)0x30, (byte)0x41};
     private byte[] asciiHexMagic = {(byte)0x61, (byte)0x63, (byte)0x65, (byte)0x64};
     
+    //TODO: add real bytes in, these are just placeholders
+    private byte[] gzipMagic = {(byte)0x72, (byte)0x4f, (byte)0x30, (byte)0x41};
+    private byte[] base64GzipMagic = {(byte)0x72, (byte)0x4f, (byte)0x30, (byte)0x41};
+
     private HashMap<String,byte[]> payloads;
     
     private String activeScanIssue;
@@ -87,6 +91,8 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     private JButton attackButtonManualTesting;
     private JButton attackBase64ButtonManualTesting;
     private JButton attackAsciiHexButtonManualTesting;
+    private JButton attackBase64GzipButtonManualTesting;
+    private JButton attackGzipButtonManualTesting;
     
     private JPanel mainPanelExploiting;
     private JSplitPane splitPaneExploiting;
@@ -100,6 +106,8 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     private JButton attackButtonExploiting;
     private JButton attackBase64ButtonExploiting;  
     private JButton attackAsciiHexButtonExploiting;
+    private JButton attackBase64GzipButtonExploiting;
+    private JButton attackGzipxButtonExploiting;
     private JTextArea resultAreaExploitingBottom;
         
     private JPanel mainPanelConfiguration;
@@ -118,6 +126,8 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     static final int TYPE_RAW = 0;
     static final int TYPE_BASE64 = 1;
     static final int TYPE_ASCII_HEX = 2;
+    static final int TYPE_BASE64GZIP = 3;
+    static final int TYPE_GZIP = 4;
     
         
     /*
@@ -220,6 +230,8 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         stdout.println("RAW");
         stdout.println("Base64");
         stdout.println("Ascii HEX");
+        stdout.println("Base64 Gzip");
+        stdout.println("Gzip");
         stdout.println("");
         stdout.println("Github: https://github.com/federicodotta/Java-Deserialization-Scanner");
         stdout.println("");
@@ -298,12 +310,22 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                 attackAsciiHexButtonManualTesting = new JButton("Attack (Ascii Hex)");
                 attackAsciiHexButtonManualTesting.setActionCommand("attackAsciiHex");
                 attackAsciiHexButtonManualTesting.addActionListener(BurpExtender.this);
+
+                attackBase64GzipButtonManualTesting = new JButton("Attack (Base64Gzip)");
+                attackBase64GzipButtonManualTesting.setActionCommand("attackBase64Gzip");
+                attackBase64GzipButtonManualTesting.addActionListener(BurpExtender.this);
+
+                attackGzipButtonManualTesting = new JButton("Attack (Gzip)");
+                attackGzipButtonManualTesting.setActionCommand("attackGzip");
+                attackGzipButtonManualTesting.addActionListener(BurpExtender.this);
                                 
                 buttonPanelManualTesting.add(setInsertionPointButtonManualTesting);
                 buttonPanelManualTesting.add(clearButtonManualTesting);
                 buttonPanelManualTesting.add(attackButtonManualTesting);
                 buttonPanelManualTesting.add(attackBase64ButtonManualTesting);
                 buttonPanelManualTesting.add(attackAsciiHexButtonManualTesting);
+                buttonPanelManualTesting.add(attackBase64GzipButtonManualTesting);
+                buttonPanelManualTesting.add(attackGzipButtonManualTesting);
                 
                 leftPanelManualTesting.add(httpServicePanelManualTesting);
                 leftPanelManualTesting.add(scrollRequestAreaManualTesting);
@@ -426,11 +448,21 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                 
                 attackAsciiHexButtonExploiting = new JButton("Attack Ascii HEX");
                 attackAsciiHexButtonExploiting.setActionCommand("attackAsciiHexButtonExploiting");
-                attackAsciiHexButtonExploiting.addActionListener(BurpExtender.this);                   
+                attackAsciiHexButtonExploiting.addActionListener(BurpExtender.this); 
+
+                attackBase64GzipButtonExploiting = new JButton("Attack Base64 Gzip");
+                attackBase64GzipButtonExploiting.setActionCommand("attackBase64GzipxButtonExploiting");
+                attackBase64GzipButtonExploiting.addActionListener(BurpExtender.this);
+
+                attackGzipButtonExploiting = new JButton("Attack Gzip");
+                attackGzipButtonExploiting.setActionCommand("attackGzipxButtonExploiting");
+                attackGzipButtonExploiting.addActionListener(BurpExtender.this);                   
                 
                 buttonPanelExploitingBottom.add(attackButtonExploiting);
                 buttonPanelExploitingBottom.add(attackBase64ButtonExploiting);
                 buttonPanelExploitingBottom.add(attackAsciiHexButtonExploiting);
+                buttonPanelExploitingBottom.add(attackBase64GzipButtonExploiting);
+                buttonPanelExploitingBottom.add(attackGzipButtonExploiting);
                 
                 leftBottomPanelExploiting.add(labelExploitingBottom);
                 leftBottomPanelExploiting.add(scrollRequestAreaExploitingBottom);
@@ -584,9 +616,21 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     	int magicPos = helpers.indexOf(request, serializeMagic, false, 0, request.length);
     	int magicPosBase64 = helpers.indexOf(request, base64Magic, false, 0, request.length);
     	int magicPosAsciiHex = helpers.indexOf(request, asciiHexMagic, false, 0, request.length);
+        int magicPosBase64Gzip = helpers.indexOf(request, base64GzipMagic, false, 0, request.length);
+        int magicPosGzip = helpers.indexOf(request, gzipMagic, false, 0, request.length);
     	
-    	if(magicPos > -1 || magicPosBase64 > -1 || magicPosAsciiHex > -1) {
+    	if(magicPos > -1 || magicPosBase64 > -1 || magicPosAsciiHex > -1 || magicPosBase64Gzip > -1 || magicPosGzip > -1) {
     		
+            //Perform an additional check if the data is base64gzipped or gzipped
+            if (magicPosBase64Gzip > -1 || magicPosGzip > -1) {
+                //Check if base64 decoding is necessary
+                if (magicPosBase64Gzip > -1) {
+                    //Base64 Decode
+                    //TODO: work out what and how to base64 decode
+                    Base64.decodeBase64URLSafe()
+                }
+            }
+
     		// Adding of marker for the vulnerability report
 			List<int[]> requestMarkers = new ArrayList<int[]>();
 			String issueName = "";
