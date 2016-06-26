@@ -107,7 +107,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     private JButton attackBase64ButtonExploiting;  
     private JButton attackAsciiHexButtonExploiting;
     private JButton attackBase64GzipButtonExploiting;
-    private JButton attackGzipxButtonExploiting;
+    private JButton attackGzipButtonExploiting;
     private JTextArea resultAreaExploitingBottom;
         
     private JPanel mainPanelConfiguration;
@@ -627,7 +627,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                 if (magicPosBase64Gzip > -1) {
                     //Base64 Decode
                     //TODO: work out what and how to base64 decode
-                    Base64.decodeBase64URLSafe()
+                    //Base64.decodeBase64URLSafe()
                 }
             }
 
