@@ -61,7 +61,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     
     //TODO: add real bytes in, these are just placeholders
     private byte[] gzipMagic = {(byte)0x72, (byte)0x4f, (byte)0x30, (byte)0x41};
-    private byte[] base64GzipMagic = {(byte)0x72, (byte)0x4f, (byte)0x30, (byte)0x41};
+    private byte[] base64GzipMagic = {(byte)0x48, (byte)0x34, (byte)0x73, (byte)0x49};
 
     private HashMap<String,byte[]> payloads;
     
@@ -616,20 +616,8 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     	int magicPos = helpers.indexOf(request, serializeMagic, false, 0, request.length);
     	int magicPosBase64 = helpers.indexOf(request, base64Magic, false, 0, request.length);
     	int magicPosAsciiHex = helpers.indexOf(request, asciiHexMagic, false, 0, request.length);
-        int magicPosBase64Gzip = helpers.indexOf(request, base64GzipMagic, false, 0, request.length);
-        int magicPosGzip = helpers.indexOf(request, gzipMagic, false, 0, request.length);
-    	
-    	if(magicPos > -1 || magicPosBase64 > -1 || magicPosAsciiHex > -1 || magicPosBase64Gzip > -1 || magicPosGzip > -1) {
-    		
-            //Perform an additional check if the data is base64gzipped or gzipped
-            if (magicPosBase64Gzip > -1 || magicPosGzip > -1) {
-                //Check if base64 decoding is necessary
-                if (magicPosBase64Gzip > -1) {
-                    //Base64 Decode
-                    //TODO: work out what and how to base64 decode
-                    //Base64.decodeBase64URLSafe()
-                }
-            }
+
+    	if(magicPos > -1 || magicPosBase64 > -1 || magicPosAsciiHex > -1) {
 
     		// Adding of marker for the vulnerability report
 			List<int[]> requestMarkers = new ArrayList<int[]>();
@@ -656,6 +644,41 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                     passiveScanRemediationDetail));
             
     	}
+        else {  //Check the response to see if there are potentially unused Java Serialised objects
+            //Get response to check for potential Java serialised objects
+            byte[] response = baseRequestResponse.getResponse();
+            
+            magicPos = helpers.indexOf(response, serializeMagic, false, 0, response.length);
+            magicPosBase64 = helpers.indexOf(response, base64Magic, false, 0, response.length);
+            magicPosAsciiHex = helpers.indexOf(response, asciiHexMagic, false, 0, response.length);
+            int magicPosBase64Gzip = helpers.indexOf(response, base64GzipMagic, false, 0, response.length);
+            int magicPosGzip = helpers.indexOf(response, gzipMagic, false, 0, response.length);
+
+            if(magicPos > -1 || magicPosBase64 > -1 || magicPosAsciiHex > -1 || magicPosBase64Gzip > -1 || magicPosGzip > -1) {
+            
+                //Perform an additional check if the data is base64gzipped or gzipped
+                if (magicPosBase64Gzip > -1 || magicPosGzip > -1) {
+                    //Check if base64 decoding is necessary
+                    if (magicPosBase64Gzip > -1) {
+
+                        //Find end quote of object
+                        int endPos = helpers.indexOf(response, new byte[]{(byte)0x22}, false, magicPosBase64Gzip, response.length);
+                        //Check if quote was found
+                        if (endPos > -1) {
+                            String extractedObject = helpers.bytesToString(Arrays.copyOfRange(response, magicPosBase64Gzip, endPos));
+                            stdout.println(extractedObject);
+
+                            //Base64 decode
+                            byte[] gzippedObject = helpers.base64Decode(extractedObject);
+
+                            //Gzip decompress
+                            
+                        }
+
+                    }
+                }
+            }
+        }
     	
         if(issues.size() > 0) {
         	//stdout.println("Reporting " + issues.size() + " passive results");
