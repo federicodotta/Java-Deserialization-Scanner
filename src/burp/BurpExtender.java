@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -19,6 +20,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.concurrent.TimeUnit;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
@@ -656,6 +659,10 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 
             if(magicPos > -1 || magicPosBase64 > -1 || magicPosAsciiHex > -1 || magicPosBase64Gzip > -1 || magicPosGzip > -1) {
             
+                // Adding of marker for the vulnerability report
+                List<int[]> responseMarkers = new ArrayList<int[]>();
+                String issueName = "";
+
                 //Perform an additional check if the data is base64gzipped or gzipped
                 if (magicPosBase64Gzip > -1 || magicPosGzip > -1) {
                     //Check if base64 decoding is necessary
@@ -666,13 +673,38 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                         //Check if quote was found
                         if (endPos > -1) {
                             String extractedObject = helpers.bytesToString(Arrays.copyOfRange(response, magicPosBase64Gzip, endPos));
-                            stdout.println(extractedObject);
 
                             //Base64 decode
                             byte[] gzippedObject = helpers.base64Decode(extractedObject);
 
-                            //Gzip decompress
-                            
+                            try 
+                            {
+                                //Gzip decompress first 2 bytes to check header for asciiHexMagic
+                                GZIPInputStream gis = new GZIPInputStream(new ByteArrayInputStream(gzippedObject));
+                                byte[] ungzip = new byte[2];
+                                gis.read(ungzip, 0, 2);
+
+                                //Check if ungzip data is the same as serializeMagic
+                                if (Arrays.equals(ungzip, serializeMagic)) {
+                                    responseMarkers.add(new int[]{magicPosBase64Gzip,endPos});
+                                    issueName = passiveScanIssue + " (encoded in Base64 & Gzipped)";
+
+                                    issues.add(new CustomScanIssue(
+                                        baseRequestResponse.getHttpService(),
+                                        helpers.analyzeRequest(baseRequestResponse).getUrl(), 
+                                        new IHttpRequestResponse[] { callbacks.applyMarkers(baseRequestResponse, null, responseMarkers) }, 
+                                        issueName,
+                                        passiveScanSeverity,
+                                        passiveScanConfidence,
+                                        passiveScanIssueDetail,
+                                        passiveScanRemediationDetail));
+                                }
+                                
+                            }
+                            catch (Exception ex)
+                            {
+                                stderr.println("Error gzip decompressing input - " + ex.getMessage());
+                            }
                         }
 
                     }
