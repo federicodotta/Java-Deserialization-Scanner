@@ -63,7 +63,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     private byte[] asciiHexMagic = {(byte)0x61, (byte)0x63, (byte)0x65, (byte)0x64};
     
     //TODO: add real bytes in, these are just placeholders
-    private byte[] gzipMagic = {(byte)0x72, (byte)0x4f, (byte)0x30, (byte)0x41};
+    private byte[] gzipMagic = {(byte)0x1f, (byte)0x8b};
     private byte[] base64GzipMagic = {(byte)0x48, (byte)0x34, (byte)0x73, (byte)0x49};
 
     private HashMap<String,byte[]> payloads;
