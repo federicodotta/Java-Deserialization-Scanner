@@ -620,6 +620,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     	int magicPosBase64 = helpers.indexOf(request, base64Magic, false, 0, request.length);
     	int magicPosAsciiHex = helpers.indexOf(request, asciiHexMagic, false, 0, request.length);
 
+        //Check the request for Java serialised objects
     	if(magicPos > -1 || magicPosBase64 > -1 || magicPosAsciiHex > -1) {
 
     		// Adding of marker for the vulnerability report
@@ -756,7 +757,24 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                 }
                 else {
                     //Add standard issues
+                    responseMarkers.add(new int[]{startPos,endPos});
 
+                    if(magicPos > -1) 
+                        issueName = passiveScanIssue;
+                    else if(magicPosBase64 > -1) 
+                        issueName = passiveScanIssue + " (encoded in Base64)";
+                    else
+                        issueName = passiveScanIssue + " (encoded in Ascii HEX)";
+                                
+                    issues.add(new CustomScanIssue(
+                            baseRequestResponse.getHttpService(),
+                            helpers.analyzeRequest(baseRequestResponse).getUrl(), 
+                            new IHttpRequestResponse[] { callbacks.applyMarkers(baseRequestResponse, responseMarkers, new ArrayList<int[]>()) }, 
+                            issueName,
+                            passiveScanSeverity,
+                            passiveScanConfidence,
+                            passiveScanIssueDetail,
+                            passiveScanRemediationDetail));
                 }
             }
         }
