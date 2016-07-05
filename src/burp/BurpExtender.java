@@ -662,52 +662,101 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                 // Adding of marker for the vulnerability report
                 List<int[]> responseMarkers = new ArrayList<int[]>();
                 String issueName = "";
+                byte[] gzippedObject;
+
+                //Initial values for start and end positions of object
+                int startPos = 1;
+                int endPos = response.length;
+                byte[] expectedStartChars = new byte[]{'"', '\'', '\n', '{', '(', '[', '<'};
+
+                //Work out start position
+                if (magicPos > -1) 
+                    startPos = magicPos;
+                else if (magicPosBase64 > -1)
+                    startPos = magicPosBase64;
+                else if (magicPosAsciiHex > -1)
+                    startPos = magicPosAsciiHex;
+                else if (magicPosBase64Gzip > -1)
+                    startPos = magicPosBase64Gzip;
+                else if (magicPosGzip > -1)
+                    startPos = magicPosGzip;
+
+                //Extract out full object by first checking what the character before it is, e.g. " ' {
+                byte[] startChar = Arrays.copyOfRange(response, startPos-1, startPos);
+
+                //Sanity check the char to see if its a reasonable and expected value
+                if (ArrayUtils.contains(expectedStartChars, startChar[0])) {
+                    //Run a follow up check to see if it is an open bracket in which case check for the equivalent close bracket
+                    if (startChar[0] == '(') 
+                        startChar[0] = ')';
+                    else if (startChar[0] == '{')
+                        startChar[0] = '}';
+                    else if (startChar[0] == '[')
+                        startChar[0] = ']';
+                    else if (startChar[0] == '<')
+                        startChar[0] = '>';
+
+                    endPos = helpers.indexOf(response, startChar, false, startPos, response.length);
+                }
+
+                //Check if endPos was found, otherwise set to response.length
+                if (endPos == -1) 
+                    endPos = response.length;
+
+                //Extract out potential object
+                byte[] potentialObject = Arrays.copyOfRange(response, startPos, endPos);
 
                 //Perform an additional check if the data is base64gzipped or gzipped
                 if (magicPosBase64Gzip > -1 || magicPosGzip > -1) {
+
                     //Check if base64 decoding is necessary
                     if (magicPosBase64Gzip > -1) {
+                        //Extract out string
+                        String extractedObject = helpers.bytesToString(potentialObject);
 
-                        //Find end quote of object
-                        int endPos = helpers.indexOf(response, new byte[]{(byte)0x22}, false, magicPosBase64Gzip, response.length);
-                        //Check if quote was found
-                        if (endPos > -1) {
-                            String extractedObject = helpers.bytesToString(Arrays.copyOfRange(response, magicPosBase64Gzip, endPos));
+                        //Base64 decode
+                        gzippedObject = helpers.base64Decode(extractedObject);
 
-                            //Base64 decode
-                            byte[] gzippedObject = helpers.base64Decode(extractedObject);
-
-                            try 
-                            {
-                                //Gzip decompress first 2 bytes to check header for asciiHexMagic
-                                GZIPInputStream gis = new GZIPInputStream(new ByteArrayInputStream(gzippedObject));
-                                byte[] ungzip = new byte[2];
-                                gis.read(ungzip, 0, 2);
-
-                                //Check if ungzip data is the same as serializeMagic
-                                if (Arrays.equals(ungzip, serializeMagic)) {
-                                    responseMarkers.add(new int[]{magicPosBase64Gzip,endPos});
-                                    issueName = passiveScanIssue + " (encoded in Base64 & Gzipped)";
-
-                                    issues.add(new CustomScanIssue(
-                                        baseRequestResponse.getHttpService(),
-                                        helpers.analyzeRequest(baseRequestResponse).getUrl(), 
-                                        new IHttpRequestResponse[] { callbacks.applyMarkers(baseRequestResponse, null, responseMarkers) }, 
-                                        issueName,
-                                        passiveScanSeverity,
-                                        passiveScanConfidence,
-                                        passiveScanIssueDetail,
-                                        passiveScanRemediationDetail));
-                                }
-                                
-                            }
-                            catch (Exception ex)
-                            {
-                                stderr.println("Error gzip decompressing input - " + ex.getMessage());
-                            }
-                        }
-
+                        //Prematurely set issue name
+                        issueName = passiveScanIssue + " (encoded in Base64 & Gzipped)";
                     }
+                    else {
+                        //Extract out gzipped object
+                        gzippedObject = potentialObject;
+                        issueName = passiveScanIssue + " (Gzipped)";
+                    }
+
+                    try 
+                    {
+                        //Gzip decompress first 2 bytes to check header for asciiHexMagic
+                        GZIPInputStream gis = new GZIPInputStream(new ByteArrayInputStream(gzippedObject));
+                        byte[] ungzip = new byte[2];
+                        gis.read(ungzip, 0, 2);
+
+                        //Check if ungzip data is the same as serializeMagic
+                        if (Arrays.equals(ungzip, serializeMagic)) {
+                            responseMarkers.add(new int[]{startPos,endPos});
+
+                            issues.add(new CustomScanIssue(
+                                baseRequestResponse.getHttpService(),
+                                helpers.analyzeRequest(baseRequestResponse).getUrl(), 
+                                new IHttpRequestResponse[] { callbacks.applyMarkers(baseRequestResponse, null, responseMarkers) }, 
+                                issueName,
+                                passiveScanSeverity,
+                                passiveScanConfidence,
+                                passiveScanIssueDetail,
+                                passiveScanRemediationDetail));
+                        }
+                        
+                    }
+                    catch (Exception ex)
+                    {
+                        stderr.println("Error gzip decompressing input - " + ex.getMessage());
+                    }
+                }
+                else {
+                    //Add standard issues
+
                 }
             }
         }
