@@ -62,7 +62,6 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     private byte[] base64Magic = {(byte)0x72, (byte)0x4f, (byte)0x30, (byte)0x41};
     private byte[] asciiHexMagic = {(byte)0x61, (byte)0x63, (byte)0x65, (byte)0x64};
     
-    //TODO: add real bytes in, these are just placeholders
     private byte[] gzipMagic = {(byte)0x1f, (byte)0x8b};
     private byte[] base64GzipMagic = {(byte)0x48, (byte)0x34, (byte)0x73, (byte)0x49};
 
@@ -619,9 +618,11 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     	int magicPos = helpers.indexOf(request, serializeMagic, false, 0, request.length);
     	int magicPosBase64 = helpers.indexOf(request, base64Magic, false, 0, request.length);
     	int magicPosAsciiHex = helpers.indexOf(request, asciiHexMagic, false, 0, request.length);
+        int magicPosBase64Gzip = helpers.indexOf(request, base64GzipMagic, false, 0, request.length);
+        int magicPosGzip = helpers.indexOf(request, gzipMagic, false, 0, request.length);
 
         //Check the request for Java serialised objects
-    	if(magicPos > -1 || magicPosBase64 > -1 || magicPosAsciiHex > -1) {
+    	if(magicPos > -1 || magicPosBase64 > -1 || magicPosAsciiHex > -1 || magicPosBase64Gzip > -1 || magicPosGzip > -1) {
 
     		// Adding of marker for the vulnerability report
 			List<int[]> requestMarkers = new ArrayList<int[]>();
@@ -632,10 +633,16 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 			} else if(magicPosBase64 > -1) {
 				requestMarkers.add(new int[]{magicPosBase64,request.length});
 				issueName = passiveScanIssue + " (encoded in Base64)";
-			} else {
+			} else if(magicPosAsciiHex > -1) {
 				requestMarkers.add(new int[]{magicPosAsciiHex,request.length});
 				issueName = passiveScanIssue + " (encoded in Ascii HEX)";
-			}
+			} else if(magicPosBase64Gzip > -1) {
+                requestMarkers.add(new int[]{magicPosBase64Gzip,request.length});
+                issueName = passiveScanIssue + " (encoded in Base64 & Gzipped)";
+            } else {
+                requestMarkers.add(new int[]{magicPosGzip,request.length});
+                issueName = passiveScanIssue + " (Gzipped)";
+            }
 						
             issues.add(new CustomScanIssue(
                     baseRequestResponse.getHttpService(),
@@ -655,8 +662,8 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
             magicPos = helpers.indexOf(response, serializeMagic, false, 0, response.length);
             magicPosBase64 = helpers.indexOf(response, base64Magic, false, 0, response.length);
             magicPosAsciiHex = helpers.indexOf(response, asciiHexMagic, false, 0, response.length);
-            int magicPosBase64Gzip = helpers.indexOf(response, base64GzipMagic, false, 0, response.length);
-            int magicPosGzip = helpers.indexOf(response, gzipMagic, false, 0, response.length);
+            magicPosBase64Gzip = helpers.indexOf(response, base64GzipMagic, false, 0, response.length);
+            magicPosGzip = helpers.indexOf(response, gzipMagic, false, 0, response.length);
 
             if(magicPos > -1 || magicPosBase64 > -1 || magicPosAsciiHex > -1 || magicPosBase64Gzip > -1 || magicPosGzip > -1) {
             
