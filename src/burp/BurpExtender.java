@@ -12,6 +12,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -741,6 +742,8 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                         byte[] ungzip = new byte[2];
                         gis.read(ungzip, 0, 2);
 
+                        //TODO: Close gzipinputstream
+
                         //Check if ungzip data is the same as serializeMagic
                         if (Arrays.equals(ungzip, serializeMagic)) {
                             responseMarkers.add(new int[]{startPos,endPos});
@@ -807,8 +810,10 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     	int magicPos = helpers.indexOf(request, serializeMagic, false, 0, request.length);
     	int magicPosBase64 = helpers.indexOf(request, base64Magic, false, 0, request.length);
     	int magicPosAsciiHex = helpers.indexOf(request, asciiHexMagic, false, 0, request.length);
+        int magicPosBase64Gzip = helpers.indexOf(request, base64GzipMagic, false, 0, request.length);
+        int magicPosGzip = helpers.indexOf(request, gzipMagic, false, 0, request.length);
     	
-    	if((magicPos > -1 && magicPos >= bodyOffset) || (magicPosBase64 > -1 && magicPosBase64 >= bodyOffset) || (magicPosAsciiHex > -1 && magicPosAsciiHex >= bodyOffset)) {
+    	if((magicPos > -1 && magicPos >= bodyOffset) || (magicPosBase64 > -1 && magicPosBase64 >= bodyOffset) || (magicPosAsciiHex > -1 && magicPosAsciiHex >= bodyOffset) || (magicPosBase64Gzip > -1 && magicPosBase64Gzip >= bodyOffset) || (magicPosGzip > -1 && magicPosGzip >= bodyOffset)) {
     		
     		List<String> headers = requestInfo.getHeaders();
     		
@@ -826,10 +831,28 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         		} else if(magicPosBase64 > -1) {
         			// Encode the payload in Base64
         			newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPosBase64),Base64.encodeBase64URLSafe(payloads.get(currentKey)));
-        		} else {
+        		} else if(magicPosAsciiHex > -1) {
         			// Encode the payload in Ascii HEX
         			newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPosAsciiHex),Hex.encodeHexString(payloads.get(currentKey)).getBytes());
-        		}
+        		} else if(magicPosBase64Gzip > -1) {
+                    // Encode/compress the payload in Gzip and Base64
+                    try {
+                        ByteArrayOutputStream outbytes = new ByteArrayOutputStream(payloads.get(currentKey).length);
+                        GZIPOutputStream gzip = new GZIPOutputStream(outbytes);
+                        gzip.write(payloads.get(currentKey));
+                        gzip.close();
+                        newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPosBase64Gzip),Base64.encodeBase64URLSafe(outbytes.toByteArray()));
+                    }
+                    catch (Exception ex) {
+                        stderr.println("Error gzip compressing input - " + ex.getMessage());
+                        newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPosBase64Gzip),Base64.encodeBase64URLSafe("ERROR in GZIP Compress".getBytes()));
+                    }
+                } else {
+                    // Encode/compress the payload with Gzip
+                    //TODO: Gzip compress the payload
+
+                }
+
         		byte[] newRequest = helpers.buildHttpMessage(headers, newBody);
         		
         		long startTime = System.nanoTime();
@@ -851,10 +874,16 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         			} else if(magicPosBase64 > -1) {
         				markerStartPos = helpers.indexOf(newRequest, base64Magic, false, 0, newRequest.length);
         				issueName = activeScanIssue + currentKey + " (encoded in Base64)";
-        			} else {
+        			} else if (magicPosAsciiHex > -1) {
         				markerStartPos = helpers.indexOf(newRequest, asciiHexMagic, false, 0, newRequest.length);
         				issueName = activeScanIssue + currentKey + " (encoded in Ascii HEX)";
-        			}
+        			} else if (magicPosBase64Gzip > -1) {
+                        markerStartPos = helpers.indexOf(newRequest, base64GzipMagic, false, 0, newRequest.length);
+                        issueName = activeScanIssue + currentKey + " (encoded in Base64 and Gzipped)";
+                    } else {
+                        markerStartPos = helpers.indexOf(newRequest, gzipMagic, false, 0, newRequest.length);
+                        issueName = activeScanIssue + currentKey + " (encoded/compressed with Gzip)";
+                    }
         	    	requestMarkers.add(new int[]{markerStartPos,newRequest.length});
         	    	
                     issues.add(new CustomScanIssue(
@@ -878,8 +907,10 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 		magicPos = helpers.indexOf(insertionPointBaseValue, serializeMagic, false, 0, insertionPointBaseValue.length);
 		magicPosBase64 = helpers.indexOf(insertionPointBaseValue, base64Magic, false, 0, insertionPointBaseValue.length);
 		magicPosAsciiHex = helpers.indexOf(insertionPointBaseValue, asciiHexMagic, false, 0, insertionPointBaseValue.length);
-		
-		if(magicPos > -1 || magicPosBase64 > -1 || magicPosAsciiHex > -1) {
+		magicPosBase64Gzip = helpers.indexOf(insertionPointBaseValue, base64GzipMagic, false, 0, insertionPointBaseValue.length);
+        magicPosGzip = helpers.indexOf(insertionPointBaseValue, gzipMagic, false, 0, insertionPointBaseValue.length);
+
+		if(magicPos > -1 || magicPosBase64 > -1 || magicPosAsciiHex > -1 || magicPosBase64Gzip > -1 || magicPosGzip > -1) {
     		
     		Set<String> payloadKeys = payloads.keySet();
     		Iterator<String> iter = payloadKeys.iterator();
@@ -892,9 +923,15 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         			newPayload = ArrayUtils.addAll(Arrays.copyOfRange(insertionPointBaseValue, 0, magicPos),payloads.get(currentKey));
         		} else if(magicPosBase64 > -1) {
         			newPayload = ArrayUtils.addAll(Arrays.copyOfRange(insertionPointBaseValue, 0, magicPosBase64),Base64.encodeBase64URLSafe(payloads.get(currentKey)));
-        		} else {
+        		} else if(magicPosAsciiHex > -1) {
         			newPayload = ArrayUtils.addAll(Arrays.copyOfRange(insertionPointBaseValue, 0, magicPosAsciiHex),Hex.encodeHexString(payloads.get(currentKey)).getBytes());
-        		}
+        		} else if(magicPosBase64Gzip > -1) {
+                    //TODO: gzip and base64 payload
+                   newPayload = ArrayUtils.addAll(Arrays.copyOfRange(insertionPointBaseValue, 0, magicPosBase64Gzip),Hex.encodeHexString(payloads.get(currentKey)).getBytes()); 
+                } else {
+                    //TODO: gzip payload
+                    newPayload = ArrayUtils.addAll(Arrays.copyOfRange(insertionPointBaseValue, 0, magicPosGzip),Hex.encodeHexString(payloads.get(currentKey)).getBytes()); 
+                }
         		
         		byte[] newRequest = insertionPoint.buildRequest(newPayload);
         		long startTime = System.nanoTime();
@@ -921,11 +958,21 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         				markerStart = helpers.indexOf(newRequest, Base64.encodeBase64URLSafe(payloads.get(currentKey)), false, 0, newRequest.length);
         				markerEnd = markerStart + helpers.urlEncode(Base64.encodeBase64URLSafe(payloads.get(currentKey))).length;
         				issueName = activeScanIssue + currentKey + " (encoded in Base64)";
-        			} else {
+        			} else if(magicPosAsciiHex > -1) {
         				markerStart = helpers.indexOf(newRequest, Hex.encodeHexString(payloads.get(currentKey)).getBytes(), false, 0, newRequest.length);
         				markerEnd = markerStart + helpers.urlEncode(Hex.encodeHexString(payloads.get(currentKey)).getBytes()).length;
         				issueName = activeScanIssue + currentKey + " (encoded in Ascii HEX)";
-        			}       			
+        			} else if(magicPosBase64Gzip > -1) {
+                        //TODO: Add base64 of gzipped payload
+                        markerStart = helpers.indexOf(newRequest, Base64.encodeBase64URLSafe(payloads.get(currentKey)), false, 0, newRequest.length);
+                        markerEnd = markerStart + helpers.urlEncode(Base64.encodeBase64URLSafe(payloads.get(currentKey))).length;
+                        issueName = activeScanIssue + currentKey + " (encoded in Base64 and Gzipped)";
+                    } else {
+                        //TODO: Add gzipped payload
+                        markerStart = helpers.indexOf(newRequest, Hex.encodeHexString(payloads.get(currentKey)).getBytes(), false, 0, newRequest.length);
+                        markerEnd = markerStart + helpers.urlEncode(Hex.encodeHexString(payloads.get(currentKey)).getBytes()).length;
+                        issueName = activeScanIssue + currentKey + " (encoded/compressed with Gzip)";
+                    }    			
         			
         			requestMarkers.add(new int[]{markerStart,markerEnd});
             		
