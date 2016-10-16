@@ -801,103 +801,15 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     public List<IScanIssue> doActiveScan(IHttpRequestResponse baseRequestResponse, IScannerInsertionPoint insertionPoint) {
     	    	
     	List<IScanIssue> issues = new ArrayList<IScanIssue>();
-    	stdout.println(insertionPoint.getBaseValue());
-    	// Full body insertion point
-    	byte[] request = baseRequestResponse.getRequest();
-    	IRequestInfo requestInfo = helpers.analyzeRequest(request);
-    	int bodyOffset = requestInfo.getBodyOffset();
-    	int magicPos = helpers.indexOf(request, serializeMagic, false, 0, request.length);
-    	int magicPosBase64 = helpers.indexOf(request, base64Magic, false, 0, request.length);
-    	int magicPosAsciiHex = helpers.indexOf(request, asciiHexMagic, false, 0, request.length);
-        int magicPosBase64Gzip = helpers.indexOf(request, base64GzipMagic, false, 0, request.length);
-        int magicPosGzip = helpers.indexOf(request, gzipMagic, false, 0, request.length);
-    	
-  //   	if((magicPos > -1 && magicPos >= bodyOffset) || (magicPosBase64 > -1 && magicPosBase64 >= bodyOffset) || (magicPosAsciiHex > -1 && magicPosAsciiHex >= bodyOffset) || (magicPosBase64Gzip > -1 && magicPosBase64Gzip >= bodyOffset) || (magicPosGzip > -1 && magicPosGzip >= bodyOffset)) {
-    		
-  //   		List<String> headers = requestInfo.getHeaders();
-    		
-  //   		Set<String> payloadKeys = payloads.keySet();
-  //   		Iterator<String> iter = payloadKeys.iterator();
-  //   		String currentKey;
-  //   		while (iter.hasNext()) {
-    			
-  //   			currentKey = iter.next();
-        		
-  //       		byte[] newBody = null; 
-  //       		if(magicPos > -1)	 {	
-  //       			// Put directly the payload
-  //       			newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPos),payloads.get(currentKey));     			
-  //       		} else if(magicPosBase64 > -1) {
-  //       			// Encode the payload in Base64
-  //       			newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPosBase64),Base64.encodeBase64URLSafe(payloads.get(currentKey)));
-  //       		} else if(magicPosAsciiHex > -1) {
-  //       			// Encode the payload in Ascii HEX
-  //       			newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPosAsciiHex),Hex.encodeHexString(payloads.get(currentKey)).getBytes());
-  //       		} else if(magicPosBase64Gzip > -1) {
-  //                   // Encode/compress the payload in Gzip and Base64
-  //                   newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPosBase64Gzip),helpers.urlEncode(Base64.encodeBase64(gzipData(payloads.get(currentKey)))));
-  //               } else {
-  //                   // Encode/compress the payload with Gzip
-  //                   newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPosGzip),gzipData(payloads.get(currentKey)));
-  //               }
-
-  //       		byte[] newRequest = helpers.buildHttpMessage(headers, newBody);
-        		
-  //       		long startTime = System.nanoTime();
-  //       		IHttpRequestResponse checkRequestResponse = callbacks.makeHttpRequest(baseRequestResponse.getHttpService(), newRequest);
-  //       		long endTime = System.nanoTime();
-  //       		long duration = (long)((((float)(endTime - startTime))) / 1000000000L);  //divide by 1000000 to get milliseconds.
-        		
-  //       		if(((int)duration) >= 10){
-        			
-  //       			// Vulnerability founded
-        			
-  //       			List<int[]> requestMarkers = new ArrayList<int[]>();
-        			
-  //       	    	int markerStartPos = 0;
-  //       	    	String issueName = "";
-  //       	    	if(magicPos > -1) {
-  //       	    		markerStartPos = helpers.indexOf(newRequest, serializeMagic, false, 0, newRequest.length);
-  //       	    		issueName = activeScanIssue + currentKey;
-  //       			} else if(magicPosBase64 > -1) {
-  //       				markerStartPos = helpers.indexOf(newRequest, base64Magic, false, 0, newRequest.length);
-  //       				issueName = activeScanIssue + currentKey + " (encoded in Base64)";
-  //       			} else if (magicPosAsciiHex > -1) {
-  //       				markerStartPos = helpers.indexOf(newRequest, asciiHexMagic, false, 0, newRequest.length);
-  //       				issueName = activeScanIssue + currentKey + " (encoded in Ascii HEX)";
-  //       			} else if (magicPosBase64Gzip > -1) {
-  //                       markerStartPos = helpers.indexOf(newRequest, base64GzipMagic, false, 0, newRequest.length);
-  //                       issueName = activeScanIssue + currentKey + " (encoded in Base64 and Gzipped)";
-  //                   } else {
-  //                       markerStartPos = helpers.indexOf(newRequest, gzipMagic, false, 0, newRequest.length);
-  //                       issueName = activeScanIssue + currentKey + " (encoded/compressed with Gzip)";
-  //                   }
-  //       	    	requestMarkers.add(new int[]{markerStartPos,newRequest.length});
-        	    	
-  //                   issues.add(new CustomScanIssue(
-  //                           baseRequestResponse.getHttpService(),
-  //                           helpers.analyzeRequest(baseRequestResponse).getUrl(), 
-  //                           new IHttpRequestResponse[] { callbacks.applyMarkers(checkRequestResponse, requestMarkers, new ArrayList<int[]>()) }, 
-  //                           issueName,
-  //                           activeScanSeverity,
-  //                           activeScanConfidence,
-  //                           activeScanIssueDetail + currentKey + ".",
-  //                           activeScanRemediationDetail));
-
-  //       		}
-        		
-  //   		}    		
-    		
-		// }
     	    	
     	// Current insertion point
     	byte[] insertionPointBaseValue = insertionPoint.getBaseValue().getBytes();
-		magicPos = helpers.indexOf(insertionPointBaseValue, serializeMagic, false, 0, insertionPointBaseValue.length);
-		magicPosBase64 = helpers.indexOf(insertionPointBaseValue, base64Magic, false, 0, insertionPointBaseValue.length);
-		magicPosAsciiHex = helpers.indexOf(insertionPointBaseValue, asciiHexMagic, false, 0, insertionPointBaseValue.length);
-		magicPosBase64Gzip = helpers.indexOf(insertionPointBaseValue, base64GzipMagic, false, 0, insertionPointBaseValue.length);
-        magicPosGzip = helpers.indexOf(insertionPointBaseValue, gzipMagic, false, 0, insertionPointBaseValue.length);
-stdout.println(magicPosBase64Gzip);
+		int magicPos = helpers.indexOf(insertionPointBaseValue, serializeMagic, false, 0, insertionPointBaseValue.length);
+		int magicPosBase64 = helpers.indexOf(insertionPointBaseValue, base64Magic, false, 0, insertionPointBaseValue.length);
+		int magicPosAsciiHex = helpers.indexOf(insertionPointBaseValue, asciiHexMagic, false, 0, insertionPointBaseValue.length);
+		int magicPosBase64Gzip = helpers.indexOf(insertionPointBaseValue, base64GzipMagic, false, 0, insertionPointBaseValue.length);
+        int magicPosGzip = helpers.indexOf(insertionPointBaseValue, gzipMagic, false, 0, insertionPointBaseValue.length);
+
 		if(magicPos > -1 || magicPosBase64 > -1 || magicPosAsciiHex > -1 || magicPosBase64Gzip > -1 || magicPosGzip > -1) {
             
     		Set<String> payloadKeys = payloads.keySet();
@@ -929,13 +841,7 @@ stdout.println(magicPosBase64Gzip);
         		if(((int)duration) >= 10){
 
         			// Vulnerability founded
-        			stdout.println(new String(newRequest));
-                    //stdout.println(new String(helpers.urlEncode(Base64.encodeBase64(gzipData(payloads.get(currentKey))))));
-                    try {
-                        stdout.println(URLEncoder.encode(new String(Base64.encodeBase64(gzipData(payloads.get(currentKey)))), "UTF-8"));
-                    } catch (Exception ex) {
-                        stderr.println(ex.getMessage());
-                    }
+
         			// Adding of marker for the vulnerability report
         			List<int[]> requestMarkers = new ArrayList<int[]>();
         			int markerStart = 0;
@@ -969,7 +875,7 @@ stdout.println(magicPosBase64Gzip);
                         markerEnd = markerStart + helpers.urlEncode(gzipData(payloads.get(currentKey))).length;
                         issueName = activeScanIssue + currentKey + " (encoded/compressed with Gzip)";
                     }    			
-        			stdout.println(markerStart + " - " + markerEnd);
+
         			requestMarkers.add(new int[]{markerStart,markerEnd});
             		
                     issues.add(new CustomScanIssue(
@@ -983,7 +889,96 @@ stdout.println(magicPosBase64Gzip);
                             activeScanRemediationDetail));        		        			
         		}        		
     		}
-    	}	
+    	}
+        else { //Check for full body insertion point now
+            // Full body insertion point
+            byte[] request = baseRequestResponse.getRequest();
+            IRequestInfo requestInfo = helpers.analyzeRequest(request);
+            int bodyOffset = requestInfo.getBodyOffset();
+            magicPos = helpers.indexOf(request, serializeMagic, false, 0, request.length);
+            magicPosBase64 = helpers.indexOf(request, base64Magic, false, 0, request.length);
+            magicPosAsciiHex = helpers.indexOf(request, asciiHexMagic, false, 0, request.length);
+            magicPosBase64Gzip = helpers.indexOf(request, base64GzipMagic, false, 0, request.length);
+            magicPosGzip = helpers.indexOf(request, gzipMagic, false, 0, request.length);
+
+            if((magicPos > -1 && magicPos == bodyOffset) || (magicPosBase64 > -1 && magicPosBase64 == bodyOffset) || (magicPosAsciiHex > -1 && magicPosAsciiHex == bodyOffset) || (magicPosBase64Gzip > -1 && magicPosBase64Gzip == bodyOffset) || (magicPosGzip > -1 && magicPosGzip == bodyOffset)) {
+                
+               List<String> headers = requestInfo.getHeaders();
+                
+               Set<String> payloadKeys = payloads.keySet();
+               Iterator<String> iter = payloadKeys.iterator();
+               String currentKey;
+               while (iter.hasNext()) {
+                    
+                   currentKey = iter.next();
+                    
+                   byte[] newBody = null; 
+                   if(magicPos > -1)    {  
+                       // Put directly the payload
+                       newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPos),payloads.get(currentKey));                
+                   } else if(magicPosBase64 > -1) {
+                       // Encode the payload in Base64
+                       newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPosBase64),Base64.encodeBase64URLSafe(payloads.get(currentKey)));
+                   } else if(magicPosAsciiHex > -1) {
+                       // Encode the payload in Ascii HEX
+                       newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPosAsciiHex),Hex.encodeHexString(payloads.get(currentKey)).getBytes());
+                   } else if(magicPosBase64Gzip > -1) {
+                        // Encode/compress the payload in Gzip and Base64
+                        newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPosBase64Gzip),Base64.encodeBase64(gzipData(payloads.get(currentKey))));
+                      } else {
+                          // Encode/compress the payload with Gzip
+                          newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPosGzip),gzipData(payloads.get(currentKey)));
+                      }
+
+                   byte[] newRequest = helpers.buildHttpMessage(headers, newBody);
+                   long startTime = System.nanoTime();
+                   IHttpRequestResponse checkRequestResponse = callbacks.makeHttpRequest(baseRequestResponse.getHttpService(), newRequest);
+                   long endTime = System.nanoTime();
+                   long duration = (long)((((float)(endTime - startTime))) / 1000000000L);  //divide by 1000000 to get milliseconds.
+                    
+                   if(((int)duration) >= 10){
+                        
+                       // Vulnerability founded
+                        
+                       List<int[]> requestMarkers = new ArrayList<int[]>();
+                        
+                       int markerStartPos = 0;
+                       String issueName = "";
+                       if(magicPos > -1) {
+                           markerStartPos = helpers.indexOf(newRequest, serializeMagic, false, 0, newRequest.length);
+                           issueName = activeScanIssue + currentKey;
+                       } else if(magicPosBase64 > -1) {
+                           markerStartPos = helpers.indexOf(newRequest, base64Magic, false, 0, newRequest.length);
+                           issueName = activeScanIssue + currentKey + " (encoded in Base64)";
+                       } else if (magicPosAsciiHex > -1) {
+                           markerStartPos = helpers.indexOf(newRequest, asciiHexMagic, false, 0, newRequest.length);
+                           issueName = activeScanIssue + currentKey + " (encoded in Ascii HEX)";
+                       } else if (magicPosBase64Gzip > -1) {
+                           markerStartPos = helpers.indexOf(newRequest, base64GzipMagic, false, 0, newRequest.length);
+                           issueName = activeScanIssue + currentKey + " (encoded in Base64 and Gzipped)";
+                       } else {
+                           markerStartPos = helpers.indexOf(newRequest, gzipMagic, false, 0, newRequest.length);
+                           issueName = activeScanIssue + currentKey + " (encoded/compressed with Gzip)";
+                       }
+                       requestMarkers.add(new int[]{markerStartPos,newRequest.length});
+                        
+                          issues.add(new CustomScanIssue(
+                                  baseRequestResponse.getHttpService(),
+                                  helpers.analyzeRequest(baseRequestResponse).getUrl(), 
+                                  new IHttpRequestResponse[] { callbacks.applyMarkers(checkRequestResponse, requestMarkers, new ArrayList<int[]>()) }, 
+                                  issueName,
+                                  activeScanSeverity,
+                                  activeScanConfidence,
+                                  activeScanIssueDetail + currentKey + ".",
+                                  activeScanRemediationDetail));
+
+                   }
+                    
+               }           
+                
+            }
+
+        }	
     	       
         if(issues.size() > 0) {
         	//stdout.println("Reporting " + issues.size() + " active results");
