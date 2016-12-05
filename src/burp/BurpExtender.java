@@ -216,6 +216,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         
         stdout.println("Java Deserialization Scanner v0.4 - The all-in-one plugin for the detection and the exploitation of Java deserialization vulnerabilities");
         stdout.println("Created by: Federico Dotta");
+        stdout.println("Contributors: Jeremy Goldstein");
         stdout.println("");
         stdout.println("Chains detected by the scanner:");
         stdout.println("Apache Commons Collections 3 (three different chains)");
