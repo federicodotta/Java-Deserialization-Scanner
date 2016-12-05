@@ -11,6 +11,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -19,6 +21,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.concurrent.TimeUnit;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
+import java.net.URLEncoder;
 
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
@@ -59,6 +64,9 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     private byte[] base64Magic = {(byte)0x72, (byte)0x4f, (byte)0x30, (byte)0x41};
     private byte[] asciiHexMagic = {(byte)0x61, (byte)0x63, (byte)0x65, (byte)0x64};
     
+    private byte[] gzipMagic = {(byte)0x1f, (byte)0x8b};
+    private byte[] base64GzipMagic = {(byte)0x48, (byte)0x34, (byte)0x73, (byte)0x49};
+
     private HashMap<String,byte[]> payloads;
     
     private String activeScanIssue;
@@ -87,6 +95,8 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     private JButton attackButtonManualTesting;
     private JButton attackBase64ButtonManualTesting;
     private JButton attackAsciiHexButtonManualTesting;
+    private JButton attackBase64GzipButtonManualTesting;
+    private JButton attackGzipButtonManualTesting;
     
     private JPanel mainPanelExploiting;
     private JSplitPane splitPaneExploiting;
@@ -100,6 +110,8 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     private JButton attackButtonExploiting;
     private JButton attackBase64ButtonExploiting;  
     private JButton attackAsciiHexButtonExploiting;
+    private JButton attackBase64GzipButtonExploiting;
+    private JButton attackGzipButtonExploiting;
     private JTextArea resultAreaExploitingBottom;
         
     private JPanel mainPanelConfiguration;
@@ -118,6 +130,8 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     static final int TYPE_RAW = 0;
     static final int TYPE_BASE64 = 1;
     static final int TYPE_ASCII_HEX = 2;
+    static final int TYPE_BASE64GZIP = 3;
+    static final int TYPE_GZIP = 4;
     
         
     /*
@@ -220,6 +234,8 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         stdout.println("RAW");
         stdout.println("Base64");
         stdout.println("Ascii HEX");
+        stdout.println("Base64 Gzip");
+        stdout.println("Gzip");
         stdout.println("");
         stdout.println("Github: https://github.com/federicodotta/Java-Deserialization-Scanner");
         stdout.println("");
@@ -298,12 +314,22 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                 attackAsciiHexButtonManualTesting = new JButton("Attack (Ascii Hex)");
                 attackAsciiHexButtonManualTesting.setActionCommand("attackAsciiHex");
                 attackAsciiHexButtonManualTesting.addActionListener(BurpExtender.this);
+
+                attackBase64GzipButtonManualTesting = new JButton("Attack (Base64Gzip)");
+                attackBase64GzipButtonManualTesting.setActionCommand("attackBase64Gzip");
+                attackBase64GzipButtonManualTesting.addActionListener(BurpExtender.this);
+
+                attackGzipButtonManualTesting = new JButton("Attack (Gzip)");
+                attackGzipButtonManualTesting.setActionCommand("attackGzip");
+                attackGzipButtonManualTesting.addActionListener(BurpExtender.this);
                                 
                 buttonPanelManualTesting.add(setInsertionPointButtonManualTesting);
                 buttonPanelManualTesting.add(clearButtonManualTesting);
                 buttonPanelManualTesting.add(attackButtonManualTesting);
                 buttonPanelManualTesting.add(attackBase64ButtonManualTesting);
                 buttonPanelManualTesting.add(attackAsciiHexButtonManualTesting);
+                buttonPanelManualTesting.add(attackBase64GzipButtonManualTesting);
+                buttonPanelManualTesting.add(attackGzipButtonManualTesting);
                 
                 leftPanelManualTesting.add(httpServicePanelManualTesting);
                 leftPanelManualTesting.add(scrollRequestAreaManualTesting);
@@ -426,11 +452,21 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                 
                 attackAsciiHexButtonExploiting = new JButton("Attack Ascii HEX");
                 attackAsciiHexButtonExploiting.setActionCommand("attackAsciiHexButtonExploiting");
-                attackAsciiHexButtonExploiting.addActionListener(BurpExtender.this);                   
+                attackAsciiHexButtonExploiting.addActionListener(BurpExtender.this); 
+
+                attackBase64GzipButtonExploiting = new JButton("Attack Base64 Gzip");
+                attackBase64GzipButtonExploiting.setActionCommand("attackBase64GzipButtonExploiting");
+                attackBase64GzipButtonExploiting.addActionListener(BurpExtender.this);
+
+                attackGzipButtonExploiting = new JButton("Attack Gzip");
+                attackGzipButtonExploiting.setActionCommand("attackGzipButtonExploiting");
+                attackGzipButtonExploiting.addActionListener(BurpExtender.this);                   
                 
                 buttonPanelExploitingBottom.add(attackButtonExploiting);
                 buttonPanelExploitingBottom.add(attackBase64ButtonExploiting);
                 buttonPanelExploitingBottom.add(attackAsciiHexButtonExploiting);
+                buttonPanelExploitingBottom.add(attackBase64GzipButtonExploiting);
+                buttonPanelExploitingBottom.add(attackGzipButtonExploiting);
                 
                 leftBottomPanelExploiting.add(labelExploitingBottom);
                 leftBottomPanelExploiting.add(scrollRequestAreaExploitingBottom);
@@ -584,9 +620,12 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     	int magicPos = helpers.indexOf(request, serializeMagic, false, 0, request.length);
     	int magicPosBase64 = helpers.indexOf(request, base64Magic, false, 0, request.length);
     	int magicPosAsciiHex = helpers.indexOf(request, asciiHexMagic, false, 0, request.length);
-    	
-    	if(magicPos > -1 || magicPosBase64 > -1 || magicPosAsciiHex > -1) {
-    		
+        int magicPosBase64Gzip = helpers.indexOf(request, base64GzipMagic, false, 0, request.length);
+        int magicPosGzip = helpers.indexOf(request, gzipMagic, false, 0, request.length);
+
+        //Check the request for Java serialised objects
+    	if(magicPos > -1 || magicPosBase64 > -1 || magicPosAsciiHex > -1 || magicPosBase64Gzip > -1 || magicPosGzip > -1) {
+
     		// Adding of marker for the vulnerability report
 			List<int[]> requestMarkers = new ArrayList<int[]>();
 			String issueName = "";
@@ -596,10 +635,16 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 			} else if(magicPosBase64 > -1) {
 				requestMarkers.add(new int[]{magicPosBase64,request.length});
 				issueName = passiveScanIssue + " (encoded in Base64)";
-			} else {
+			} else if(magicPosAsciiHex > -1) {
 				requestMarkers.add(new int[]{magicPosAsciiHex,request.length});
 				issueName = passiveScanIssue + " (encoded in Ascii HEX)";
-			}
+			} else if(magicPosBase64Gzip > -1) {
+                requestMarkers.add(new int[]{magicPosBase64Gzip,request.length});
+                issueName = passiveScanIssue + " (encoded in Base64 & Gzipped)";
+            } else {
+                requestMarkers.add(new int[]{magicPosGzip,request.length});
+                issueName = passiveScanIssue + " (Gzipped)";
+            }
 						
             issues.add(new CustomScanIssue(
                     baseRequestResponse.getHttpService(),
@@ -612,6 +657,136 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                     passiveScanRemediationDetail));
             
     	}
+        else {  //Check the response to see if there are potentially unused Java Serialised objects
+            //Get response to check for potential Java serialised objects
+            byte[] response = baseRequestResponse.getResponse();
+            
+            magicPos = helpers.indexOf(response, serializeMagic, false, 0, response.length);
+            magicPosBase64 = helpers.indexOf(response, base64Magic, false, 0, response.length);
+            magicPosAsciiHex = helpers.indexOf(response, asciiHexMagic, false, 0, response.length);
+            magicPosBase64Gzip = helpers.indexOf(response, base64GzipMagic, false, 0, response.length);
+            magicPosGzip = helpers.indexOf(response, gzipMagic, false, 0, response.length);
+
+            if(magicPos > -1 || magicPosBase64 > -1 || magicPosAsciiHex > -1 || magicPosBase64Gzip > -1 || magicPosGzip > -1) {
+            
+                // Adding of marker for the vulnerability report
+                List<int[]> responseMarkers = new ArrayList<int[]>();
+                String issueName = "";
+                byte[] gzippedObject;
+
+                //Initial values for start and end positions of object
+                int startPos = 1;
+                int endPos = response.length;
+                byte[] expectedStartChars = new byte[]{'"', '\'', '\n', '{', '(', '[', '<'};
+
+                //Work out start position
+                if (magicPos > -1) 
+                    startPos = magicPos;
+                else if (magicPosBase64 > -1)
+                    startPos = magicPosBase64;
+                else if (magicPosAsciiHex > -1)
+                    startPos = magicPosAsciiHex;
+                else if (magicPosBase64Gzip > -1)
+                    startPos = magicPosBase64Gzip;
+                else if (magicPosGzip > -1)
+                    startPos = magicPosGzip;
+
+                //Extract out full object by first checking what the character before it is, e.g. " ' {
+                byte[] startChar = Arrays.copyOfRange(response, startPos-1, startPos);
+
+                //Sanity check the char to see if its a reasonable and expected value
+                if (ArrayUtils.contains(expectedStartChars, startChar[0])) {
+                    //Run a follow up check to see if it is an open bracket in which case check for the equivalent close bracket
+                    if (startChar[0] == '(') 
+                        startChar[0] = ')';
+                    else if (startChar[0] == '{')
+                        startChar[0] = '}';
+                    else if (startChar[0] == '[')
+                        startChar[0] = ']';
+                    else if (startChar[0] == '<')
+                        startChar[0] = '>';
+
+                    endPos = helpers.indexOf(response, startChar, false, startPos, response.length);
+                }
+
+                //Check if endPos was found, otherwise set to response.length
+                if (endPos == -1) 
+                    endPos = response.length;
+
+                //Extract out potential object
+                byte[] potentialObject = Arrays.copyOfRange(response, startPos, endPos);
+
+                //Perform an additional check if the data is base64gzipped or gzipped
+                if (magicPosBase64Gzip > -1 || magicPosGzip > -1) {
+
+                    //Check if base64 decoding is necessary
+                    if (magicPosBase64Gzip > -1) {
+                        //Extract out string
+                        String extractedObject = helpers.bytesToString(potentialObject);
+
+                        //Base64 decode
+                        gzippedObject = helpers.base64Decode(extractedObject);
+
+                        //Prematurely set issue name
+                        issueName = passiveScanIssue + " (encoded in Base64 & Gzipped)";
+                    }
+                    else {
+                        //Extract out gzipped object
+                        gzippedObject = potentialObject;
+                        issueName = passiveScanIssue + " (Gzipped)";
+                    }
+
+                    try 
+                    {
+                        //Gzip decompress first 2 bytes to check header for asciiHexMagic
+                        GZIPInputStream gis = new GZIPInputStream(new ByteArrayInputStream(gzippedObject));
+                        byte[] ungzip = new byte[2];
+                        gis.read(ungzip, 0, 2);
+
+                        //Check if ungzip data is the same as serializeMagic
+                        if (Arrays.equals(ungzip, serializeMagic)) {
+                            responseMarkers.add(new int[]{startPos,endPos});
+
+                            issues.add(new CustomScanIssue(
+                                baseRequestResponse.getHttpService(),
+                                helpers.analyzeRequest(baseRequestResponse).getUrl(), 
+                                new IHttpRequestResponse[] { callbacks.applyMarkers(baseRequestResponse, null, responseMarkers) }, 
+                                issueName,
+                                passiveScanSeverity,
+                                passiveScanConfidence,
+                                passiveScanIssueDetail,
+                                passiveScanRemediationDetail));
+                        }
+                        
+                    }
+                    catch (Exception ex)
+                    {
+                        stderr.println("Error gzip decompressing input - " + ex.getMessage());
+                    }
+                }
+                else {
+                    //Add standard issues
+                    responseMarkers.add(new int[]{startPos,endPos});
+
+                    if(magicPos > -1) 
+                        issueName = passiveScanIssue;
+                    else if(magicPosBase64 > -1) 
+                        issueName = passiveScanIssue + " (encoded in Base64)";
+                    else
+                        issueName = passiveScanIssue + " (encoded in Ascii HEX)";
+                                
+                    issues.add(new CustomScanIssue(
+                            baseRequestResponse.getHttpService(),
+                            helpers.analyzeRequest(baseRequestResponse).getUrl(), 
+                            new IHttpRequestResponse[] { callbacks.applyMarkers(baseRequestResponse, responseMarkers, new ArrayList<int[]>()) }, 
+                            issueName,
+                            passiveScanSeverity,
+                            passiveScanConfidence,
+                            passiveScanIssueDetail,
+                            passiveScanRemediationDetail));
+                }
+            }
+        }
     	
         if(issues.size() > 0) {
         	//stdout.println("Reporting " + issues.size() + " passive results");
@@ -626,88 +801,17 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     public List<IScanIssue> doActiveScan(IHttpRequestResponse baseRequestResponse, IScannerInsertionPoint insertionPoint) {
     	    	
     	List<IScanIssue> issues = new ArrayList<IScanIssue>();
-    	
-    	// Full body insertion point
-    	byte[] request = baseRequestResponse.getRequest();
-    	IRequestInfo requestInfo = helpers.analyzeRequest(request);
-    	int bodyOffset = requestInfo.getBodyOffset();
-    	int magicPos = helpers.indexOf(request, serializeMagic, false, 0, request.length);
-    	int magicPosBase64 = helpers.indexOf(request, base64Magic, false, 0, request.length);
-    	int magicPosAsciiHex = helpers.indexOf(request, asciiHexMagic, false, 0, request.length);
-    	
-    	if((magicPos > -1 && magicPos >= bodyOffset) || (magicPosBase64 > -1 && magicPosBase64 >= bodyOffset) || (magicPosAsciiHex > -1 && magicPosAsciiHex >= bodyOffset)) {
-    		
-    		List<String> headers = requestInfo.getHeaders();
-    		
-    		Set<String> payloadKeys = payloads.keySet();
-    		Iterator<String> iter = payloadKeys.iterator();
-    		String currentKey;
-    		while (iter.hasNext()) {
-    			
-    			currentKey = iter.next();
-        		
-        		byte[] newBody = null; 
-        		if(magicPos > -1)	 {	
-        			// Put directly the payload
-        			newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPos),payloads.get(currentKey));     			
-        		} else if(magicPosBase64 > -1) {
-        			// Encode the payload in Base64
-        			newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPosBase64),Base64.encodeBase64URLSafe(payloads.get(currentKey)));
-        		} else {
-        			// Encode the payload in Ascii HEX
-        			newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPosAsciiHex),Hex.encodeHexString(payloads.get(currentKey)).getBytes());
-        		}
-        		byte[] newRequest = helpers.buildHttpMessage(headers, newBody);
-        		
-        		long startTime = System.nanoTime();
-        		IHttpRequestResponse checkRequestResponse = callbacks.makeHttpRequest(baseRequestResponse.getHttpService(), newRequest);
-        		long endTime = System.nanoTime();
-        		long duration = (long)((((float)(endTime - startTime))) / 1000000000L);  //divide by 1000000 to get milliseconds.
-        		
-        		if(((int)duration) >= 10){
-        			
-        			// Vulnerability founded
-        			
-        			List<int[]> requestMarkers = new ArrayList<int[]>();
-        			
-        	    	int markerStartPos = 0;
-        	    	String issueName = "";
-        	    	if(magicPos > -1) {
-        	    		markerStartPos = helpers.indexOf(newRequest, serializeMagic, false, 0, newRequest.length);
-        	    		issueName = activeScanIssue + currentKey;
-        			} else if(magicPosBase64 > -1) {
-        				markerStartPos = helpers.indexOf(newRequest, base64Magic, false, 0, newRequest.length);
-        				issueName = activeScanIssue + currentKey + " (encoded in Base64)";
-        			} else {
-        				markerStartPos = helpers.indexOf(newRequest, asciiHexMagic, false, 0, newRequest.length);
-        				issueName = activeScanIssue + currentKey + " (encoded in Ascii HEX)";
-        			}
-        	    	requestMarkers.add(new int[]{markerStartPos,newRequest.length});
-        	    	
-                    issues.add(new CustomScanIssue(
-                            baseRequestResponse.getHttpService(),
-                            helpers.analyzeRequest(baseRequestResponse).getUrl(), 
-                            new IHttpRequestResponse[] { callbacks.applyMarkers(checkRequestResponse, requestMarkers, new ArrayList<int[]>()) }, 
-                            issueName,
-                            activeScanSeverity,
-                            activeScanConfidence,
-                            activeScanIssueDetail + currentKey + ".",
-                            activeScanRemediationDetail));
-
-        		}
-        		
-    		}    		
-    		
-		}
     	    	
     	// Current insertion point
     	byte[] insertionPointBaseValue = insertionPoint.getBaseValue().getBytes();
-		magicPos = helpers.indexOf(insertionPointBaseValue, serializeMagic, false, 0, insertionPointBaseValue.length);
-		magicPosBase64 = helpers.indexOf(insertionPointBaseValue, base64Magic, false, 0, insertionPointBaseValue.length);
-		magicPosAsciiHex = helpers.indexOf(insertionPointBaseValue, asciiHexMagic, false, 0, insertionPointBaseValue.length);
-		
-		if(magicPos > -1 || magicPosBase64 > -1 || magicPosAsciiHex > -1) {
-    		
+		int magicPos = helpers.indexOf(insertionPointBaseValue, serializeMagic, false, 0, insertionPointBaseValue.length);
+		int magicPosBase64 = helpers.indexOf(insertionPointBaseValue, base64Magic, false, 0, insertionPointBaseValue.length);
+		int magicPosAsciiHex = helpers.indexOf(insertionPointBaseValue, asciiHexMagic, false, 0, insertionPointBaseValue.length);
+		int magicPosBase64Gzip = helpers.indexOf(insertionPointBaseValue, base64GzipMagic, false, 0, insertionPointBaseValue.length);
+        int magicPosGzip = helpers.indexOf(insertionPointBaseValue, gzipMagic, false, 0, insertionPointBaseValue.length);
+
+		if(magicPos > -1 || magicPosBase64 > -1 || magicPosAsciiHex > -1 || magicPosBase64Gzip > -1 || magicPosGzip > -1) {
+            
     		Set<String> payloadKeys = payloads.keySet();
     		Iterator<String> iter = payloadKeys.iterator();
     		String currentKey;
@@ -719,9 +823,13 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         			newPayload = ArrayUtils.addAll(Arrays.copyOfRange(insertionPointBaseValue, 0, magicPos),payloads.get(currentKey));
         		} else if(magicPosBase64 > -1) {
         			newPayload = ArrayUtils.addAll(Arrays.copyOfRange(insertionPointBaseValue, 0, magicPosBase64),Base64.encodeBase64URLSafe(payloads.get(currentKey)));
-        		} else {
+        		} else if(magicPosAsciiHex > -1) {
         			newPayload = ArrayUtils.addAll(Arrays.copyOfRange(insertionPointBaseValue, 0, magicPosAsciiHex),Hex.encodeHexString(payloads.get(currentKey)).getBytes());
-        		}
+        		} else if(magicPosBase64Gzip > -1) {
+                   newPayload = ArrayUtils.addAll(Arrays.copyOfRange(insertionPointBaseValue, 0, magicPosBase64Gzip),Base64.encodeBase64(gzipData(payloads.get(currentKey))));
+                } else {
+                    newPayload = ArrayUtils.addAll(Arrays.copyOfRange(insertionPointBaseValue, 0, magicPosGzip),gzipData(payloads.get(currentKey))); 
+                }
         		
         		byte[] newRequest = insertionPoint.buildRequest(newPayload);
         		long startTime = System.nanoTime();
@@ -733,7 +841,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         		if(((int)duration) >= 10){
 
         			// Vulnerability founded
-        			
+
         			// Adding of marker for the vulnerability report
         			List<int[]> requestMarkers = new ArrayList<int[]>();
         			int markerStart = 0;
@@ -748,12 +856,26 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         				markerStart = helpers.indexOf(newRequest, Base64.encodeBase64URLSafe(payloads.get(currentKey)), false, 0, newRequest.length);
         				markerEnd = markerStart + helpers.urlEncode(Base64.encodeBase64URLSafe(payloads.get(currentKey))).length;
         				issueName = activeScanIssue + currentKey + " (encoded in Base64)";
-        			} else {
+        			} else if(magicPosAsciiHex > -1) {
         				markerStart = helpers.indexOf(newRequest, Hex.encodeHexString(payloads.get(currentKey)).getBytes(), false, 0, newRequest.length);
         				markerEnd = markerStart + helpers.urlEncode(Hex.encodeHexString(payloads.get(currentKey)).getBytes()).length;
         				issueName = activeScanIssue + currentKey + " (encoded in Ascii HEX)";
-        			}       			
-        			
+        			} else if(magicPosBase64Gzip > -1) {
+                        //Need to use more comprehensive URL encoding as / doesn't get encoded
+                        try {
+                            markerStart = helpers.indexOf(newRequest, URLEncoder.encode(new String(Base64.encodeBase64(gzipData(payloads.get(currentKey)))), "UTF-8").getBytes(), false, 0, newRequest.length);
+                            markerEnd = markerStart + URLEncoder.encode(new String(Base64.encodeBase64(gzipData(payloads.get(currentKey)))), "UTF-8").getBytes().length;
+                            issueName = activeScanIssue + currentKey + " (encoded in Base64 and Gzipped)";
+                        }
+                        catch (Exception ex) {
+                            stderr.println(ex.getMessage());
+                        }
+                    } else {
+                        markerStart = helpers.indexOf(newRequest, gzipData(payloads.get(currentKey)), false, 0, newRequest.length);
+                        markerEnd = markerStart + helpers.urlEncode(gzipData(payloads.get(currentKey))).length;
+                        issueName = activeScanIssue + currentKey + " (encoded/compressed with Gzip)";
+                    }    			
+
         			requestMarkers.add(new int[]{markerStart,markerEnd});
             		
                     issues.add(new CustomScanIssue(
@@ -767,7 +889,96 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                             activeScanRemediationDetail));        		        			
         		}        		
     		}
-    	}	
+    	}
+        else { //Check for full body insertion point now
+            // Full body insertion point
+            byte[] request = baseRequestResponse.getRequest();
+            IRequestInfo requestInfo = helpers.analyzeRequest(request);
+            int bodyOffset = requestInfo.getBodyOffset();
+            magicPos = helpers.indexOf(request, serializeMagic, false, 0, request.length);
+            magicPosBase64 = helpers.indexOf(request, base64Magic, false, 0, request.length);
+            magicPosAsciiHex = helpers.indexOf(request, asciiHexMagic, false, 0, request.length);
+            magicPosBase64Gzip = helpers.indexOf(request, base64GzipMagic, false, 0, request.length);
+            magicPosGzip = helpers.indexOf(request, gzipMagic, false, 0, request.length);
+
+            if((magicPos > -1 && magicPos == bodyOffset) || (magicPosBase64 > -1 && magicPosBase64 == bodyOffset) || (magicPosAsciiHex > -1 && magicPosAsciiHex == bodyOffset) || (magicPosBase64Gzip > -1 && magicPosBase64Gzip == bodyOffset) || (magicPosGzip > -1 && magicPosGzip == bodyOffset)) {
+                
+               List<String> headers = requestInfo.getHeaders();
+                
+               Set<String> payloadKeys = payloads.keySet();
+               Iterator<String> iter = payloadKeys.iterator();
+               String currentKey;
+               while (iter.hasNext()) {
+                    
+                   currentKey = iter.next();
+                    
+                   byte[] newBody = null; 
+                   if(magicPos > -1)    {  
+                       // Put directly the payload
+                       newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPos),payloads.get(currentKey));                
+                   } else if(magicPosBase64 > -1) {
+                       // Encode the payload in Base64
+                       newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPosBase64),Base64.encodeBase64URLSafe(payloads.get(currentKey)));
+                   } else if(magicPosAsciiHex > -1) {
+                       // Encode the payload in Ascii HEX
+                       newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPosAsciiHex),Hex.encodeHexString(payloads.get(currentKey)).getBytes());
+                   } else if(magicPosBase64Gzip > -1) {
+                        // Encode/compress the payload in Gzip and Base64
+                        newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPosBase64Gzip),Base64.encodeBase64(gzipData(payloads.get(currentKey))));
+                      } else {
+                          // Encode/compress the payload with Gzip
+                          newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPosGzip),gzipData(payloads.get(currentKey)));
+                      }
+
+                   byte[] newRequest = helpers.buildHttpMessage(headers, newBody);
+                   long startTime = System.nanoTime();
+                   IHttpRequestResponse checkRequestResponse = callbacks.makeHttpRequest(baseRequestResponse.getHttpService(), newRequest);
+                   long endTime = System.nanoTime();
+                   long duration = (long)((((float)(endTime - startTime))) / 1000000000L);  //divide by 1000000 to get milliseconds.
+                    
+                   if(((int)duration) >= 10){
+                        
+                       // Vulnerability founded
+                        
+                       List<int[]> requestMarkers = new ArrayList<int[]>();
+                        
+                       int markerStartPos = 0;
+                       String issueName = "";
+                       if(magicPos > -1) {
+                           markerStartPos = helpers.indexOf(newRequest, serializeMagic, false, 0, newRequest.length);
+                           issueName = activeScanIssue + currentKey;
+                       } else if(magicPosBase64 > -1) {
+                           markerStartPos = helpers.indexOf(newRequest, base64Magic, false, 0, newRequest.length);
+                           issueName = activeScanIssue + currentKey + " (encoded in Base64)";
+                       } else if (magicPosAsciiHex > -1) {
+                           markerStartPos = helpers.indexOf(newRequest, asciiHexMagic, false, 0, newRequest.length);
+                           issueName = activeScanIssue + currentKey + " (encoded in Ascii HEX)";
+                       } else if (magicPosBase64Gzip > -1) {
+                           markerStartPos = helpers.indexOf(newRequest, base64GzipMagic, false, 0, newRequest.length);
+                           issueName = activeScanIssue + currentKey + " (encoded in Base64 and Gzipped)";
+                       } else {
+                           markerStartPos = helpers.indexOf(newRequest, gzipMagic, false, 0, newRequest.length);
+                           issueName = activeScanIssue + currentKey + " (encoded/compressed with Gzip)";
+                       }
+                       requestMarkers.add(new int[]{markerStartPos,newRequest.length});
+                        
+                          issues.add(new CustomScanIssue(
+                                  baseRequestResponse.getHttpService(),
+                                  helpers.analyzeRequest(baseRequestResponse).getUrl(), 
+                                  new IHttpRequestResponse[] { callbacks.applyMarkers(checkRequestResponse, requestMarkers, new ArrayList<int[]>()) }, 
+                                  issueName,
+                                  activeScanSeverity,
+                                  activeScanConfidence,
+                                  activeScanIssueDetail + currentKey + ".",
+                                  activeScanRemediationDetail));
+
+                   }
+                    
+               }           
+                
+            }
+
+        }	
     	       
         if(issues.size() > 0) {
         	//stdout.println("Reporting " + issues.size() + " active results");
@@ -795,6 +1006,12 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     		int existingMagicPosAsciiHex = helpers.indexOf(existingRequestResponse, asciiHexMagic, false, 0, existingRequestResponse.length);
     		int newMagicPosAsciiHex = helpers.indexOf(newRequestResponse, asciiHexMagic, false, 0, newRequestResponse.length);
         	
+            int existingMagicPosBase64Gzip = helpers.indexOf(existingRequestResponse, base64GzipMagic, false, 0, existingRequestResponse.length);
+            int newMagicPosBase64Gzip = helpers.indexOf(newRequestResponse, base64GzipMagic, false, 0, newRequestResponse.length);
+            
+            int existingMagicPosGzip = helpers.indexOf(existingRequestResponse, gzipMagic, false, 0, existingRequestResponse.length);
+            int newMagicPosGzip = helpers.indexOf(newRequestResponse, gzipMagic, false, 0, newRequestResponse.length);
+            
         	if((existingMagicPos > -1) && (newMagicPos > -1)) {
         		        		
             	if(existingMagicPos == newMagicPos) {
@@ -821,7 +1038,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
             	
             	}  
         		
-        	} else {
+        	} else if ((existingMagicPosAsciiHex > -1) && (newMagicPosAsciiHex > -1)){
         		
         		if(existingMagicPosAsciiHex == newMagicPosAsciiHex) {
                 	
@@ -833,7 +1050,33 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
             		return 0;
             	
             	}  
-        	}
+
+        	} else if ((existingMagicPosBase64Gzip > -1) && (newMagicPosBase64Gzip > -1)){
+                
+                if(existingMagicPosBase64Gzip == newMagicPosBase64Gzip) {
+                    
+                    //stdout.println("Consolidate duplicate issue");                
+                    return -1;
+                
+                } else {
+                
+                    return 0;
+                
+                } 
+
+            } else {
+                
+                if(existingMagicPosGzip == newMagicPosGzip) {
+                    
+                    //stdout.println("Consolidate duplicate issue");                
+                    return -1;
+                
+                } else {
+                
+                    return 0;
+                
+                }  
+            } 
 
         } else { 
         	
@@ -889,7 +1132,25 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 			};
 			t.start();
 		
-		} else if(command.equals("setInsertionPoint")) {
+		} else if(command.equals("attackBase64Gzip")) {
+        
+            Thread t = new Thread() {
+                public void run() {
+                    executeManualTest(BurpExtender.TYPE_BASE64GZIP);
+                }
+            };
+            t.start();
+        
+        } else if(command.equals("attackGzip")) {
+        
+            Thread t = new Thread() {
+                public void run() {
+                    executeManualTest(BurpExtender.TYPE_GZIP);
+                }
+            };
+            t.start();
+        
+        } else if(command.equals("setInsertionPoint")) {
 			
 			insertInjectionCharacters(requestAreaManualTesting);
 			
@@ -945,7 +1206,25 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 			};
 			t.start();		
 			
-		} else if(command.equals("sendRepeaterManualTesting")) {
+		} else if(command.equals("attackBase64GzipButtonExploiting")) {
+            
+            Thread t = new Thread() {
+                public void run() {
+                    attackExploitation(BurpExtender.TYPE_BASE64GZIP);
+                }
+            };
+            t.start();      
+            
+        } else if(command.equals("attackGzipButtonExploiting")) {
+            
+            Thread t = new Thread() {
+                public void run() {
+                    attackExploitation(BurpExtender.TYPE_GZIP);
+                }
+            };
+            t.start();      
+            
+        } else if(command.equals("sendRepeaterManualTesting")) {
 			
 			callbacks.sendToRepeater(hostManualTesting.getText().trim(), Integer.parseInt(portManualTesting.getText().trim()), useHttpsManualTesting.isSelected(), requestAreaManualTesting.getText().getBytes(), null);
 						
@@ -1115,6 +1394,8 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 		attackButtonExploiting.setEnabled(false);
 		attackBase64ButtonExploiting.setEnabled(false);
 		attackAsciiHexButtonExploiting.setEnabled(false);
+        attackBase64GzipButtonExploiting.setEnabled(false);
+        attackGzipButtonExploiting.setEnabled(false);
 		
 		String requestString = requestAreaExploitingTop.getText();
 		int payloadFrom = requestString.indexOf(insertionPointChar);
@@ -1137,9 +1418,13 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     				request = ArrayUtils.addAll(prePayloadRequest,payloadYSoSerial);
     			} else if(encoding == BurpExtender.TYPE_BASE64) {
     				request = ArrayUtils.addAll(prePayloadRequest,Base64.encodeBase64URLSafe(payloadYSoSerial));
-    			} else {
+    			} else if(encoding == BurpExtender.TYPE_ASCII_HEX) {
     				request = ArrayUtils.addAll(prePayloadRequest,Hex.encodeHexString(payloadYSoSerial).getBytes());
-    			}
+    			} else if(encoding == BurpExtender.TYPE_BASE64GZIP) {
+                    request = ArrayUtils.addAll(prePayloadRequest,Base64.encodeBase64(gzipData(payloadYSoSerial)));
+                } else {
+                    request = ArrayUtils.addAll(prePayloadRequest,gzipData(payloadYSoSerial));
+                }
 				
     			request = ArrayUtils.addAll(request,postPayloadRequest);
     			
@@ -1178,6 +1463,8 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 		attackButtonExploiting.setEnabled(true);
 		attackBase64ButtonExploiting.setEnabled(true);
 		attackAsciiHexButtonExploiting.setEnabled(true);
+        attackBase64GzipButtonExploiting.setEnabled(true);
+        attackGzipButtonExploiting.setEnabled(true);
 		
 	}	
 	
@@ -1187,6 +1474,8 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 		attackButtonManualTesting.setEnabled(false);
 		attackBase64ButtonManualTesting.setEnabled(false);
 		attackAsciiHexButtonManualTesting.setEnabled(false);
+        attackBase64GzipButtonManualTesting.setEnabled(false);
+        attackGzipButtonManualTesting.setEnabled(false);
 		
 		String requestString = requestAreaManualTesting.getText();
 		int payloadFrom = requestString.indexOf(insertionPointChar);
@@ -1221,9 +1510,13 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     				request = ArrayUtils.addAll(prePayloadRequest,payloads.get(currentKey));
     			} else if(encoding == BurpExtender.TYPE_BASE64) {
     				request = ArrayUtils.addAll(prePayloadRequest,Base64.encodeBase64URLSafe(payloads.get(currentKey)));
-    			} else {
+    			} else if(encoding == BurpExtender.TYPE_ASCII_HEX) {
     				request = ArrayUtils.addAll(prePayloadRequest,Hex.encodeHexString(payloads.get(currentKey)).getBytes());
-    			}
+    			} else if(encoding == BurpExtender.TYPE_BASE64GZIP) {
+                    request = ArrayUtils.addAll(prePayloadRequest,Base64.encodeBase64(gzipData(payloads.get(currentKey))));
+                } else {
+                    request = ArrayUtils.addAll(prePayloadRequest,gzipData(payloads.get(currentKey)));
+                }
     			
     			request = ArrayUtils.addAll(request,postPayloadRequest);
     			    			
@@ -1256,9 +1549,13 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         					issueName = activeScanIssue + currentKey;
         				} else if(encoding == BurpExtender.TYPE_BASE64) {
         					issueName = activeScanIssue + currentKey + " (encoded in Base64)";
-        				} else {
+        				} else if(encoding == BurpExtender.TYPE_ASCII_HEX) {
         					issueName = activeScanIssue + currentKey + " (encoded in Ascii HEX)";
-        				}
+        				} else if(encoding == BurpExtender.TYPE_BASE64GZIP) {
+                            issueName = activeScanIssue + currentKey + " (encoded in Base64 and Gzipped)";
+                        } else {
+                            issueName = activeScanIssue + currentKey + " (encoded/compressed with Gzip)";
+                        }
         				
         				
         				callbacks.addScanIssue(new CustomScanIssue(
@@ -1313,6 +1610,8 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 		attackButtonManualTesting.setEnabled(true);
 		attackBase64ButtonManualTesting.setEnabled(true);
 		attackAsciiHexButtonManualTesting.setEnabled(true);
+        attackBase64GzipButtonManualTesting.setEnabled(true);
+        attackGzipButtonManualTesting.setEnabled(true);
 		
 	}
 
@@ -1417,6 +1716,21 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
             }
         } else {
             return new String[0];
+        }
+    }
+
+    private byte[] gzipData(byte[] input) {
+        //Try to gzip compress the given string
+        try {
+            ByteArrayOutputStream outbytes = new ByteArrayOutputStream(input.length);
+            GZIPOutputStream gzip = new GZIPOutputStream(outbytes);
+            gzip.write(input);
+            gzip.close();
+            return outbytes.toByteArray();
+        }
+        catch (Exception ex) {
+            stderr.println("Error gzip compressing input - " + ex.getMessage());
+            return "ERROR in GZIP Compress".getBytes();
         }
     }
 
