@@ -135,6 +135,9 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         
     /*
      * TODO
+     * - Add new CommonsCollections3 and new Java8 payloads
+     * - Add generic payload, to find serialization vulnerabilities also without vulnerable libraries
+     * - Add DNS payloads with new Collaborator API
      * - This version active check for Deserialization Vulnerability IF AND ONLY IF
      * the base value is already a serialized Java Object. Maybe can be useful to add
      * a further mode in which the vulnerability is checked on every parameter, despite
