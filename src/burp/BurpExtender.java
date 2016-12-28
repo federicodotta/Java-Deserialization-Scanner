@@ -1519,7 +1519,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     			} else if(encoding == BurpExtender.TYPE_ASCII_HEX) {
     				request = ArrayUtils.addAll(prePayloadRequest,Hex.encodeHexString(payloadYSoSerial).getBytes());
     			} else if(encoding == BurpExtender.TYPE_BASE64GZIP) {
-                    request = ArrayUtils.addAll(prePayloadRequest,Base64.encodeBase64(gzipData(payloadYSoSerial)));
+                    request = ArrayUtils.addAll(prePayloadRequest,URLEncoder.encode(new String(Base64.encodeBase64(gzipData(payloadYSoSerial)))).getBytes());
                 } else {
                     request = ArrayUtils.addAll(prePayloadRequest,gzipData(payloadYSoSerial));
                 }
@@ -1611,7 +1611,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     			} else if(encoding == BurpExtender.TYPE_ASCII_HEX) {
     				request = ArrayUtils.addAll(prePayloadRequest,Hex.encodeHexString(payloads.get(currentKey)).getBytes());
     			} else if(encoding == BurpExtender.TYPE_BASE64GZIP) {
-                    request = ArrayUtils.addAll(prePayloadRequest,Base64.encodeBase64(gzipData(payloads.get(currentKey))));
+                    request = ArrayUtils.addAll(prePayloadRequest,URLEncoder.encode(new String(Base64.encodeBase64(gzipData(payloads.get(currentKey))))).getBytes());
                 } else {
                     request = ArrayUtils.addAll(prePayloadRequest,gzipData(payloads.get(currentKey)));
                 }
