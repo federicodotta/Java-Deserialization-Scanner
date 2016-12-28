@@ -23,6 +23,7 @@ import java.util.StringTokenizer;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
+import java.net.URLEncoder;
 
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
@@ -923,7 +924,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         		} else if(magicPosAsciiHex > -1) {
         			newPayload = ArrayUtils.addAll(Arrays.copyOfRange(insertionPointBaseValue, 0, magicPosAsciiHex),Hex.encodeHexString(payloads.get(currentKey)).getBytes());
         		} else if(magicPosBase64Gzip > -1) {
-                   newPayload = ArrayUtils.addAll(Arrays.copyOfRange(insertionPointBaseValue, 0, magicPosBase64Gzip),Base64.encodeBase64URLSafe(gzipData(payloads.get(currentKey))));
+                   newPayload = ArrayUtils.addAll(Arrays.copyOfRange(insertionPointBaseValue, 0, magicPosBase64Gzip),Base64.encodeBase64(gzipData(payloads.get(currentKey))));
                 } else {
                     newPayload = ArrayUtils.addAll(Arrays.copyOfRange(insertionPointBaseValue, 0, magicPosGzip),gzipData(payloads.get(currentKey))); 
                 }
@@ -960,8 +961,8 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         			} else if(magicPosBase64Gzip > -1) {
                         //Need to use more comprehensive URL encoding as / doesn't get encoded
                         try {
-                            markerStart = helpers.indexOf(newRequest, Base64.encodeBase64URLSafe(gzipData(payloads.get(currentKey))), false, 0, newRequest.length);
-                            markerEnd = markerStart + helpers.urlEncode(Base64.encodeBase64URLSafe(gzipData(payloads.get(currentKey)))).length;
+                            markerStart = helpers.indexOf(newRequest, URLEncoder.encode(new String(Base64.encodeBase64(gzipData(payloads.get(currentKey)))), "UTF-8").getBytes(), false, 0, newRequest.length);
+                            markerEnd = markerStart + URLEncoder.encode(new String(Base64.encodeBase64(gzipData(payloads.get(currentKey)))), "UTF-8").getBytes().length;
                             issueName = activeScanIssue + currentKey + " (encoded in Base64 and Gzipped)";
                         }
                         catch (Exception ex) {
@@ -1021,7 +1022,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                        newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPosAsciiHex),Hex.encodeHexString(payloads.get(currentKey)).getBytes());
                    } else if(magicPosBase64Gzip > -1) {
                         // Encode/compress the payload in Gzip and Base64
-                        newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPosBase64Gzip),Base64.encodeBase64URLSafe(gzipData(payloads.get(currentKey))));
+                        newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPosBase64Gzip),Base64.encodeBase64(gzipData(payloads.get(currentKey))));
 					} else {
 						// Encode/compress the payload with Gzip
 					    newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPosGzip),gzipData(payloads.get(currentKey)));
@@ -1518,7 +1519,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     			} else if(encoding == BurpExtender.TYPE_ASCII_HEX) {
     				request = ArrayUtils.addAll(prePayloadRequest,Hex.encodeHexString(payloadYSoSerial).getBytes());
     			} else if(encoding == BurpExtender.TYPE_BASE64GZIP) {
-                    request = ArrayUtils.addAll(prePayloadRequest,Base64.encodeBase64URLSafe(gzipData(payloadYSoSerial)));
+                    request = ArrayUtils.addAll(prePayloadRequest,Base64.encodeBase64(gzipData(payloadYSoSerial)));
                 } else {
                     request = ArrayUtils.addAll(prePayloadRequest,gzipData(payloadYSoSerial));
                 }
@@ -1610,7 +1611,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     			} else if(encoding == BurpExtender.TYPE_ASCII_HEX) {
     				request = ArrayUtils.addAll(prePayloadRequest,Hex.encodeHexString(payloads.get(currentKey)).getBytes());
     			} else if(encoding == BurpExtender.TYPE_BASE64GZIP) {
-                    request = ArrayUtils.addAll(prePayloadRequest,Base64.encodeBase64URLSafe(gzipData(payloads.get(currentKey))));
+                    request = ArrayUtils.addAll(prePayloadRequest,Base64.encodeBase64(gzipData(payloads.get(currentKey))));
                 } else {
                     request = ArrayUtils.addAll(prePayloadRequest,gzipData(payloads.get(currentKey)));
                 }
