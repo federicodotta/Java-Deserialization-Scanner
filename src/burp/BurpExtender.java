@@ -691,13 +691,13 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                     gzippedObject = helpers.base64Decode(extractedObject);
 
                     //Prematurely set issue name
-                    issueName = passiveScanIssue + " (encoded in Base64 & Gzipped)";
+                    issueName = passiveScanIssue + " in request (encoded in Base64 & Gzipped)";
                 
                 } else {
                 	
                     //Extract out gzipped object
                     gzippedObject = potentialObject;
-                    issueName = passiveScanIssue + " (Gzipped)";
+                    issueName = passiveScanIssue + " in request (Gzipped)";
                     
                 }
 
