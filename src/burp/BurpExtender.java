@@ -706,7 +706,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                     //Gzip decompress first 2 bytes to check header for asciiHexMagic
                     GZIPInputStream gis = new GZIPInputStream(new ByteArrayInputStream(gzippedObject));
                     byte[] ungzip = new byte[2];
-                    gis.read(ungzip, 0, 2);
+                    gis.read(ungzip);
 
                     //Check if ungzip data is the same as serializeMagic
                     if (Arrays.equals(ungzip, serializeMagic)) {
