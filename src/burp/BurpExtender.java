@@ -715,7 +715,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                         issues.add(new CustomScanIssue(
                             baseRequestResponse.getHttpService(),
                             helpers.analyzeRequest(baseRequestResponse).getUrl(), 
-                            new IHttpRequestResponse[] { callbacks.applyMarkers(baseRequestResponse, null, responseMarkers) }, 
+                            new IHttpRequestResponse[] { callbacks.applyMarkers(baseRequestResponse, responseMarkers, null) },
                             issueName,
                             passiveScanSeverity,
                             passiveScanConfidence,
