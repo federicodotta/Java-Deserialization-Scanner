@@ -684,11 +684,18 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 
                 //Check if base64 decoding is necessary
                 if (magicPosBase64Gzip > -1) {
-                    //Extract out string
-                    String extractedObject = helpers.bytesToString(potentialObject);
+                    //Check is URL decoding is necessary before Base64 decoding
+                    boolean urlEncoded = false;
+                    for (int i = 0; i < potentialObject.length; i++) {
+                        if (potentialObject[i] == (byte)'%') {
+                            urlEncoded = true;
+                            break;
+                        }
+                    }
 
                     //Base64 decode
-                    gzippedObject = helpers.base64Decode(extractedObject);
+                    gzippedObject = helpers.base64Decode(urlEncoded ?
+							helpers.urlDecode(potentialObject) : potentialObject);
 
                     //Prematurely set issue name
                     issueName = passiveScanIssue + " in request (encoded in Base64 & Gzipped)";
