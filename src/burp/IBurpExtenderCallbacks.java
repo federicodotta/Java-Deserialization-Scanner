@@ -27,6 +27,7 @@ import java.util.Map;
  */
 public interface IBurpExtenderCallbacks
 {
+
     /**
      * Flag used to identify Burp Suite as a whole.
      */
@@ -81,9 +82,8 @@ public interface IBurpExtenderCallbacks
     void setExtensionName(String name);
 
     /**
-     * This method is used to obtain an
-     * <code>IExtensionHelpers</code> object, which can be used by the extension
-     * to perform numerous useful tasks.
+     * This method is used to obtain an <code>IExtensionHelpers</code> object,
+     * which can be used by the extension to perform numerous useful tasks.
      *
      * @return An object containing numerous helper methods, for tasks such as
      * building and analyzing HTTP requests.
@@ -399,7 +399,7 @@ public interface IBurpExtenderCallbacks
      * @return A list of Intruder payload generator factories that are currently
      * registered by this extension.
      */
-    List<IIntruderPayloadGeneratorFactory> 
+    List<IIntruderPayloadGeneratorFactory>
             getIntruderPayloadGeneratorFactories();
 
     /**
@@ -541,8 +541,7 @@ public interface IBurpExtenderCallbacks
 
     /**
      * This method is used to load configuration settings for the extension that
-     * were saved using the method
-     * <code>saveExtensionSetting()</code>.
+     * were saved using the method <code>saveExtensionSetting()</code>.
      *
      * @param name The name of the setting.
      * @return The value of the setting, or <code>null</code> if no value is
@@ -802,7 +801,7 @@ public interface IBurpExtenderCallbacks
      * @param issues The Scanner issues to be reported.
      * @param file The file to which the report will be saved.
      */
-    void generateScanReport(String format, IScanIssue[] issues, 
+    void generateScanReport(String format, IScanIssue[] issues,
             java.io.File file);
 
     /**
@@ -847,7 +846,9 @@ public interface IBurpExtenderCallbacks
      * and must not be called from the event dispatch thread.
      *
      * @param file The file containing Burp's saved state.
+     * @deprecated State files have been replaced with Burp project files.
      */
+    @Deprecated
     void restoreState(java.io.File file);
 
     /**
@@ -856,7 +857,9 @@ public interface IBurpExtenderCallbacks
      * called from the event dispatch thread.
      *
      * @param file The file to save Burp's state in.
+     * @deprecated State files have been replaced with Burp project files.
      */
+    @Deprecated
     void saveState(java.io.File file);
 
     /**
@@ -865,7 +868,9 @@ public interface IBurpExtenderCallbacks
      *
      * @return A Map of name/value Strings reflecting Burp's current
      * configuration.
+     * @deprecated Use <code>saveConfigAsJson()</code> instead.
      */
+    @Deprecated
     Map<String, String> saveConfig();
 
     /**
@@ -874,13 +879,42 @@ public interface IBurpExtenderCallbacks
      * be restored to their default values. To selectively update only some
      * settings and leave the rest unchanged, you should first call
      * <code>saveConfig()</code> to obtain Burp's current configuration, modify
-     * the relevant items in the Map, and then call
-     * <code>loadConfig()</code> with the same Map.
+     * the relevant items in the Map, and then call <code>loadConfig()</code>
+     * with the same Map.
      *
      * @param config A map of name/value Strings to use as Burp's new
      * configuration.
+     * @deprecated Use <code>loadConfigFromJson()</code> instead.
      */
+    @Deprecated
     void loadConfig(Map<String, String> config);
+
+    /**
+     * This method causes Burp to save its current project-level configuration
+     * in JSON format. This is the same format that can be saved and loaded via
+     * the Burp user interface. To include only certain sections of the
+     * configuration, you can optionally supply the path to each section that
+     * should be included, for example: "project_options.connections". If no
+     * paths are provided, then the entire configuration will be saved.
+     *
+     * @param configPaths A list of Strings representing the path to each
+     * configuration section that should be included.
+     * @return A String representing the current configuration in JSON format.
+     */
+    String saveConfigAsJson(String... configPaths);
+
+    /**
+     * This method causes Burp to load a new project-level configuration from
+     * the JSON String provided. This is the same format that can be saved and
+     * loaded via the Burp user interface. Partial configurations are
+     * acceptable, and any settings not specified will be left unmodified.
+     *
+     * Any user-level configuration options contained in the input will be
+     * ignored.
+     *
+     * @param config A JSON String containing the new configuration.
+     */
+    void loadConfigFromJson(String config);
 
     /**
      * This method sets the master interception mode for Burp Proxy.
@@ -912,8 +946,8 @@ public interface IBurpExtenderCallbacks
     String getExtensionFilename();
 
     /**
-     * This method determines whether the current extension was loaded as a
-     * BApp (a Burp App from the BApp Store).
+     * This method determines whether the current extension was loaded as a BApp
+     * (a Burp App from the BApp Store).
      *
      * @return Returns true if the current extension was loaded as a BApp.
      */
@@ -997,9 +1031,8 @@ public interface IBurpExtenderCallbacks
     /**
      * This method is used to register a new Scanner issue. <b>Note:</b>
      * Wherever possible, extensions should implement custom Scanner checks
-     * using
-     * <code>IScannerCheck</code> and report issues via those checks, so as to
-     * integrate with Burp's user-driven workflow, and ensure proper
+     * using <code>IScannerCheck</code> and report issues via those checks, so
+     * as to integrate with Burp's user-driven workflow, and ensure proper
      * consolidation of duplicate reported issues. This method is only designed
      * for tasks outside of the normal testing workflow, such as importing
      * results from other scanning tools.
@@ -1008,6 +1041,18 @@ public interface IBurpExtenderCallbacks
      * <code>IScanIssue</code> interface.
      */
     void addScanIssue(IScanIssue issue);
+
+    /**
+     * This method is used to create a new Burp Collaborator client context,
+     * which can be used to generate Burp Collaborator payloads and poll the
+     * Collaborator server for any network interactions that result from using
+     * those payloads.
+     *
+     * @return A new instance of  <code>IBurpCollaboratorClientContext</code>
+     * that can be used to generate Collaborator payloads and retrieve
+     * interactions.
+     */
+    IBurpCollaboratorClientContext createBurpCollaboratorClientContext();
 
     /**
      * This method parses the specified request and returns details of each

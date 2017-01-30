@@ -9,8 +9,9 @@ package burp;
  * and Burp Suite Professional, provided that this usage does not violate the
  * license terms for those products.
  */
-import java.util.List;
+
 import javax.swing.JMenuItem;
+import java.util.List;
 
 /**
  * Extensions can implement this interface and then call
