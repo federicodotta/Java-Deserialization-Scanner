@@ -136,6 +136,8 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     
     private IHttpRequestResponse[] selectedItems;
     
+    private ArrayList<String> urlBodyAlreadyScanned;
+    
     private char insertionPointChar;
     
     private IHttpRequestResponse currentExploitationRequestResponse;
@@ -154,6 +156,9 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         
     /*
      * TODO
+     * - Check payloads with java.io.IOException: java.io.StreamCorruptedException: invalid stream header: ACED7033
+     * - Fix passive scan bug
+     * - Check Java 8 DNS vector
      * - Do body check only in the first parameter
      * - Check timoeout Burp in CPU payload
      * - This version active check for Deserialization Vulnerability IF AND ONLY IF
@@ -263,6 +268,8 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         dialogTitle = "Are you sure?";
         dialogMessage = "The execution of this payload can cause high CPU consumtion for various seconds/minutes and it may causes DoS on older services and high loaded services. DO NOT send simultaneous requests to the same server.";
         dialogButtonsMessages = new String[]{ "Yes", "Cancel" }; 
+        
+        urlBodyAlreadyScanned = new ArrayList<String>();
         
         stdout.println("Java Deserialization Scanner v0.4 - The all-in-one plugin for the detection and the exploitation of Java deserialization vulnerabilities");
         stdout.println("Created by: Federico Dotta");
@@ -974,6 +981,9 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 		int magicPosBase64Gzip = helpers.indexOf(insertionPointBaseValue, base64GzipMagic, false, 0, insertionPointBaseValue.length);
         int magicPosGzip = helpers.indexOf(insertionPointBaseValue, gzipMagic, false, 0, insertionPointBaseValue.length);
 
+        byte[] request = baseRequestResponse.getRequest();
+        IRequestInfo requestInfo = helpers.analyzeRequest(baseRequestResponse);
+        
 		if(magicPos > -1 || magicPosBase64 > -1 || magicPosAsciiHex > -1 || magicPosBase64Gzip > -1 || magicPosGzip > -1) {
 			
 			// Collaborator context for DNS payloads
@@ -1097,16 +1107,19 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         		}        		
     		}
     	}
-        else { //Check for full body insertion point now
-            // Full body insertion point
-            byte[] request = baseRequestResponse.getRequest();
-            IRequestInfo requestInfo = helpers.analyzeRequest(request);
+        else if(!urlBodyAlreadyScanned.contains(requestInfo.getUrl().toExternalForm())){ //Check for full body insertion point if not already tested
+        	       	
+        	// Full body insertion point
+            
             int bodyOffset = requestInfo.getBodyOffset();
             magicPos = helpers.indexOf(request, serializeMagic, false, 0, request.length);
             magicPosBase64 = helpers.indexOf(request, base64Magic, false, 0, request.length);
             magicPosAsciiHex = helpers.indexOf(request, asciiHexMagic, false, 0, request.length);
             magicPosBase64Gzip = helpers.indexOf(request, base64GzipMagic, false, 0, request.length);
             magicPosGzip = helpers.indexOf(request, gzipMagic, false, 0, request.length);
+            
+            // Add the url to the urlBodyAlreadyScanned arraylist in order to avoid duplicate scanning of the body
+        	urlBodyAlreadyScanned.add(requestInfo.getUrl().toExternalForm());
 
             if((magicPos > -1 && magicPos == bodyOffset) || (magicPosBase64 > -1 && magicPosBase64 == bodyOffset) || (magicPosAsciiHex > -1 && magicPosAsciiHex == bodyOffset) || (magicPosBase64Gzip > -1 && magicPosBase64Gzip == bodyOffset) || (magicPosGzip > -1 && magicPosGzip == bodyOffset)) {
                 
@@ -1993,10 +2006,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 		
 		int indexFirstCharacter = helpers.indexOf(origVector, hostTokenString.getBytes(), true, 0, origVector.length);
 		int indexLastCharacter = indexFirstCharacter + hostTokenString.length() -1;
-		
-		stdout.println(origVector[indexLastCharacter]);
-		stdout.println(origVector[indexLastCharacter-1]);
-		
+				
 		int newCollaboratorVectorLength = collaboratorURL.length();
 		
 		byte[] preDNSVector = Arrays.copyOfRange(origVector, 0, indexFirstCharacter);
