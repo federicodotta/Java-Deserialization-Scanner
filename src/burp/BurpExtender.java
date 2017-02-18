@@ -159,6 +159,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         
     /*
      * TODO
+     * - Check exploitation with ysoserial and hibernate/not hibernate
      * - Add BeanUtils
      * - Check JDk7 DNS vector
      * - Fix passive scan bug
@@ -1683,7 +1684,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 				stdout.println(commandParts[i]);
 			
 			Runtime rt = Runtime.getRuntime();
-			String[] commands = {"java","-jar",pathYsoserial};
+			String[] commands = {"java","-Dhibernate5","-jar",pathYsoserial};
 			String[] fullCommands = ArrayUtils.addAll(commands, commandParts);
 			Process proc = rt.exec(fullCommands);
 			
