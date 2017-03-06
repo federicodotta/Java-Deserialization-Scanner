@@ -1681,8 +1681,6 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 		try {
 			
 			String[] commandParts = translateCommandline(requestAreaExploitingBottom.getText().trim());
-			for(int i=0;i<commandParts.length;i++)
-				stdout.println(commandParts[i]);
 			
 			Runtime rt = Runtime.getRuntime();
 			String[] commands = {"java","-Dhibernate5","-jar",pathYsoserial};
@@ -1692,22 +1690,27 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 			InputStream stdInput = proc.getInputStream();
 			BufferedReader stdError = new BufferedReader(new InputStreamReader(proc.getErrorStream()));
 			
-			String s = stdError.readLine();
-			byte[] outputYSoSerial;
-			if(s != null) {
-				stderr.println("ERROR");
-				stderr.println(s);
-				while ((s = stdError.readLine()) != null) {
-				    stderr.println(s);
-				}	
+			byte[] outputYSoSerial = IOUtils.toByteArray(stdInput);
+			
+			if(outputYSoSerial.length == 0) {
+				
+				String s = stdError.readLine();
+				if(s != null) {
+					stderr.println("ERROR");
+					stderr.println(s);
+					while ((s = stdError.readLine()) != null) {
+						stderr.println(s);
+					}
+				}
+				
 				return null;
+				
 			} else {
 				
-				outputYSoSerial = IOUtils.toByteArray(stdInput);
 				return outputYSoSerial;
-
+				
 			}
-			
+						
 		} catch (IOException e) {
 			stderr.println(e.toString());
 			return null;
@@ -1759,7 +1762,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     			List<String> headers = requestInfo.getHeaders();
     			byte[] body = Arrays.copyOfRange(request, requestInfo.getBodyOffset(), request.length);
     			request = helpers.buildHttpMessage(headers, body); 			
-    		    			
+    			
     			long startTime = System.nanoTime();
     			currentExploitationRequestResponse = callbacks.makeHttpRequest(httpService, request);
     			long endTime = System.nanoTime();
