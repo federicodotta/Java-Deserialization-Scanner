@@ -1,5 +1,5 @@
 # Java Deserialization Scanner
-Java Deserialization Scanner is a Burp Suite plugin aimed at detect and exploit Java deserialization vulnerabilities. It was written by Federico Dotta, a Security Expert at @ Mediaservice.net. 
+Java Deserialization Scanner is a Burp Suite plugin aimed at detect and exploit Java deserialization vulnerabilities. It was written by Federico Dotta, a Security Advisor at @ Mediaservice.net. 
 
 The plugin is made up of three different components:
 
@@ -8,7 +8,11 @@ The plugin is made up of three different components:
 3.	Exploiter, that allow to actively exploit Java deserialization vulnerabilies, using frohoff ysoserial (https://github.com/frohoff/ysoserial)
 
 # Author
-- Federico Dotta, Security Expert at @ Mediaservice.net
+- Federico Dotta, Security Advisor at @ Mediaservice.net
+
+# Contributors
+- Jeremy Goldstein
+- Andras Veres-Szentkiralyi
 
 # Integration with Burp Suite active and passive scanner
 Java Deserialization Scanner uses custom payloads generated with a modified version of "ysoserial", tool created by frohoff and gebl, to detect Java deserialization vulnerabilities. The original tool (https://github.com/frohoff/ysoserial) generate payloads for the execution of commands on the system, using the Runtime.exec function. Usually, however, it is not possible to see the output of the command and consequently it is not simple to write a scanner based on this kind of function. The modified version adds the generation of payloads that execute a syncronous sleep function, very useful to check for the presence of the Java deserialization issues in an automated way.

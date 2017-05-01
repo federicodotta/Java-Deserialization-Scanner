@@ -288,13 +288,14 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         
         urlBodyAlreadyScanned = new ArrayList<String>();
         
-        stdout.println("Java Deserialization Scanner v0.4 - The all-in-one plugin for the detection and the exploitation of Java deserialization vulnerabilities");
+        stdout.println("Java Deserialization Scanner v0.5 - The all-in-one plugin for the detection and the exploitation of Java deserialization vulnerabilities");
         stdout.println("Created by: Federico Dotta");
-        stdout.println("Contributors: Jeremy Goldstein");
+        stdout.println("Contributors: Jeremy Goldstein, Andras Veres-Szentkiralyi");
         stdout.println("");
         stdout.println("Chains detected by the scanner:");
         stdout.println("Apache Commons Collections 3 (four different chains)");
         stdout.println("Apache Commons Collections 4 (two different chains)");
+        stdout.println("Apache Commons BeanUtils");
         stdout.println("Spring (two different chains)");
         stdout.println("Java 6 and Java 7 (<= jdk7u21)");
         stdout.println("Java 8 (<= jdk8u20)");
