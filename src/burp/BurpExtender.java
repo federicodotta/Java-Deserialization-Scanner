@@ -775,20 +775,27 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 
                 //Check if base64 decoding is necessary
                 if (magicPosBase64Gzip > -1) {
-                    //Extract out string
-                    String extractedObject = helpers.bytesToString(potentialObject);
+                    //Check is URL decoding is necessary before Base64 decoding
+                    boolean urlEncoded = false;
+                    for (int i = 0; i < potentialObject.length; i++) {
+                        if (potentialObject[i] == (byte)'%') {
+                            urlEncoded = true;
+                            break;
+                        }
+                    }
 
                     //Base64 decode
-                    gzippedObject = helpers.base64Decode(extractedObject);
+                    gzippedObject = helpers.base64Decode(urlEncoded ?
+							helpers.urlDecode(potentialObject) : potentialObject);
 
                     //Prematurely set issue name
-                    issueName = passiveScanIssue + " (encoded in Base64 & Gzipped)";
+                    issueName = passiveScanIssue + " in request (encoded in Base64 & Gzipped)";
                 
                 } else {
                 	
                     //Extract out gzipped object
                     gzippedObject = potentialObject;
-                    issueName = passiveScanIssue + " (Gzipped)";
+                    issueName = passiveScanIssue + " in request (Gzipped)";
                     
                 }
 
@@ -797,7 +804,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                     //Gzip decompress first 2 bytes to check header for asciiHexMagic
                     GZIPInputStream gis = new GZIPInputStream(new ByteArrayInputStream(gzippedObject));
                     byte[] ungzip = new byte[2];
-                    gis.read(ungzip, 0, 2);
+                    gis.read(ungzip);
 
                     //Check if ungzip data is the same as serializeMagic
                     if (Arrays.equals(ungzip, serializeMagic)) {
@@ -806,7 +813,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                         issues.add(new CustomScanIssue(
                             baseRequestResponse.getHttpService(),
                             helpers.analyzeRequest(baseRequestResponse).getUrl(), 
-                            new IHttpRequestResponse[] { callbacks.applyMarkers(baseRequestResponse, null, responseMarkers) }, 
+                            new IHttpRequestResponse[] { callbacks.applyMarkers(baseRequestResponse, responseMarkers, null) },
                             issueName,
                             passiveScanSeverity,
                             passiveScanConfidence,
@@ -833,7 +840,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                 issues.add(new CustomScanIssue(
                         baseRequestResponse.getHttpService(),
                         helpers.analyzeRequest(baseRequestResponse).getUrl(), 
-                        new IHttpRequestResponse[] { callbacks.applyMarkers(baseRequestResponse, responseMarkers, new ArrayList<int[]>()) }, 
+                        new IHttpRequestResponse[] { callbacks.applyMarkers(baseRequestResponse, responseMarkers, null) },
                         issueName,
                         passiveScanSeverity,
                         passiveScanConfidence,
