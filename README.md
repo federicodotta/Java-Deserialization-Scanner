@@ -14,26 +14,45 @@ The plugin is made up of three different components:
 - Jeremy Goldstein
 - Andras Veres-Szentkiralyi
 
+# Mini walkthrough (24/05/17)
+A brief article containing a mini walkthrough on how to use the various components of the plugin can be found at the following URL:
+https://techblog.mediaservice.net/2017/05/reliable-discovery-and-exploitation-of-java-deserialization-vulnerabilities/
+
 # Integration with Burp Suite active and passive scanner
-Java Deserialization Scanner uses custom payloads generated with a modified version of "ysoserial", tool created by frohoff and gebl, to detect Java deserialization vulnerabilities. The original tool (https://github.com/frohoff/ysoserial) generate payloads for the execution of commands on the system, using the Runtime.exec function. Usually, however, it is not possible to see the output of the command and consequently it is not simple to write a scanner based on this kind of function. The modified version adds the generation of payloads that execute a syncronous sleep function, very useful to check for the presence of the Java deserialization issues in an automated way.
+Java Deserialization Scanner uses custom payloads generated with a modified version of "ysoserial", tool created by frohoff and gebl, to detect Java deserialization vulnerabilities. The original tool (https://github.com/frohoff/ysoserial) generate payloads for the execution of commands on the system, using the Runtime.exec function. Usually, however, it is not possible to see the output of the command and consequently it is not simple to write a scanner based on this kind of function. For this reason, a modified version of ysoserial is used to generate different types of payloads, usefull for the detection of the issue instead of the exploitation:
 
-Currently, the passive checks of the Java Deserialiation Scanner reported the presence of serialized Java objects in the HTTP requests (in raw format or encoded in Base64 or in Ascii Hex) and the active checks actively scan for the presence of weak deserialization functions in conjuction with the presence of the following weak libraries:
+1. Payloads that execute a syncronous sleep function, in order to verify the presence of the issue depending on the time of the response
+2. Payloads that execute a DNS resolution, in order to verify the presence of the issue using the Burp Suite Collaborator integrated in Burp Suite
 
-1.	Apache Commons Collections 3 (up to 3.2.1), with three different chains
+Currently, the passive checks of the Java Deserialiation Scanner reported the presence of serialized Java objects in the HTTP requests and the active checks actively scan for the presence of weak deserialization functions in conjuction with the presence of the following weak libraries:
+
+1.	Apache Commons Collections 3 (up to 3.2.1), with four different chains
 2.	Apache Commons Collections 4 (up to 4.4.0), with two different chains
 3.	Spring (up to 4.2.2), with two different chains
-4.  Java 6 and Java 7 (<= Jdk7u21) without any weak library
+4.  Java 6 and Java 7 (up to Jdk7u21) without any weak library
 5.	Hibernate 5
 6.	JSON
 7.	Rome
+8.	Java 8 (up to Jdk8u20) without any weak library
+9.	Apache Commons BeanUtils
+
+All the components of the plugin supports the following encodings:
+
+1.	Raw
+2.	Base64
+3.	Ascii Hex
+4.	GZIP
+5.	Base64 GZIP
 
 In the test folder there are some simple Java server applications that can be used to test the plugin. Every application employ a different vulnerable Java library.
 
 # Manual tester
-The plugin offer a dedicated tab to launch the detection with the sleep payloads on custom insertion points, in order to check the Java deserialization vulnerabilities in particular situations in which strange entry points do not allow the detection with the scanner. The results of the manual tester can be inserted between Burp Suite scanner results.
+The plugin offer a dedicated tab to launch the detection with the sleep and DNS payloads on custom insertion points, in order to check the Java deserialization vulnerabilities in particular situations in which strange entry points do not allow the detection with the scanner. The results of the manual tester can be inserted between Burp Suite scanner results.
+
+The manual tester offers an extra detection method: CPU detection. The CPU detection method is based on Wouter Coekaerts’ SerialDOS work (https://gist.github.com/coekie/a27cc406fc9f3dc7a70d) and it is able to detect deserialization issues without the presence of any vulnerable library, using an object that employs many CPU cycles for the deserialization task and checking the time of the response. The CPU detection method is not included by default in the active scan checks, because it must be used with caution: sending a huge number of “light” SerialDOS payloads may still cause problems on old or highly-loaded systems. 
 
 # Exploiter
-After that a Java deserialization vulnerability has been found, it is possible to actively exploit the issue with the Exploiting dedicated tab. The plugin allow to configure the path of frohoff ysoserial and use this tool to generate the exploitation payloads. The exploiter, as the other components, supports three different encodings for the payloads: raw, Base64 or Ascii Hex.
+After that a Java deserialization vulnerability has been found, it is possible to actively exploit the issue with the Exploiting dedicated tab. The “Exploiting” tab offers a comfortable interface to exploit deserialization vulnerabilities. This tab uses the ysoserial tool to generate exploitation vectors and includes the generated payload in a HTTP request. ysoserial takes as argument a vulnerable library and a command and generates a serialized object in binary form that can be sent to the vulnerable application to execute the command on the target system (obviously if the target application is vulnerable). The Exploiting tab supports the same encoding formats as the detection sections of the plugin.
 
 # Screenshot
 ![alt tag](https://raw.githubusercontent.com/federicodotta/Java-Deserialization-Scanner/master/JavaDeserializationScanner.png)
