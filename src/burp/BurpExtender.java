@@ -157,6 +157,10 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
             public String toString() { return "Encode using Base64"; }
             public byte[] transform(byte[] input) throws IOException { return Base64.encodeBase64(input); }
         },
+        BASE64_URL_SAFE {
+            public String toString() { return "Encode using URL-safe Base64"; }
+            public byte[] transform(byte[] input) throws IOException { return Base64.encodeBase64URLSafe(input); }
+        },
         ASCII_HEX {
             public String toString() { return "Encode using ASCII hex"; }
             public byte[] transform(byte[] input) throws IOException { return hex.encode(input); }
