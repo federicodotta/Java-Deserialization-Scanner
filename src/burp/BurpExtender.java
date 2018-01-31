@@ -27,6 +27,7 @@ import java.util.StringTokenizer;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
+import java.util.zip.DeflaterOutputStream;
 import java.net.URLEncoder;
 
 import javax.swing.BoxLayout;
@@ -151,6 +152,12 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
             public String toString() { return "Compress using gzip"; }
 			protected OutputStream getCompressor(OutputStream os) throws IOException {
 				return new GZIPOutputStream(os);
+			}
+        },
+        ZLIB {
+            public String toString() { return "Compress using zlib"; }
+			protected OutputStream getCompressor(OutputStream os) throws IOException {
+				return new DeflaterOutputStream(os);
 			}
         },
         BASE64 {
@@ -348,6 +355,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         stdout.println("Base64");
         stdout.println("Ascii HEX");
         stdout.println("Base64 Gzip");
+        stdout.println("Base64 Zlib (for attack only)");
         stdout.println("Gzip");
         stdout.println("");
         stdout.println("Github: https://github.com/federicodotta/Java-Deserialization-Scanner");
