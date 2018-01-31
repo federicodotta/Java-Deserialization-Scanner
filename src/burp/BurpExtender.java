@@ -150,15 +150,15 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     private enum Transformation {
         GZIP {
             public String toString() { return "Compress using gzip"; }
-			protected OutputStream getCompressor(OutputStream os) throws IOException {
-				return new GZIPOutputStream(os);
-			}
+            protected OutputStream getCompressor(OutputStream os) throws IOException {
+                return new GZIPOutputStream(os);
+            }
         },
         ZLIB {
             public String toString() { return "Compress using zlib"; }
-			protected OutputStream getCompressor(OutputStream os) throws IOException {
-				return new DeflaterOutputStream(os);
-			}
+            protected OutputStream getCompressor(OutputStream os) throws IOException {
+                return new DeflaterOutputStream(os);
+            }
         },
         BASE64 {
             public String toString() { return "Encode using Base64"; }
@@ -180,14 +180,14 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
             }
         };
 
-		protected OutputStream getCompressor(OutputStream os) throws IOException { return null; }
-		public byte[] transform(byte[] input) throws IOException {
-			ByteArrayOutputStream outbytes = new ByteArrayOutputStream(input.length);
-			OutputStream comp = getCompressor(outbytes);
-			comp.write(input);
-			comp.close();
-			return outbytes.toByteArray();
-		}
+        protected OutputStream getCompressor(OutputStream os) throws IOException { return null; }
+        public byte[] transform(byte[] input) throws IOException {
+            ByteArrayOutputStream outbytes = new ByteArrayOutputStream(input.length);
+            OutputStream comp = getCompressor(outbytes);
+            comp.write(input);
+            comp.close();
+            return outbytes.toByteArray();
+        }
     }
 
     static final int TYPE_RAW = 0;
