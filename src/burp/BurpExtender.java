@@ -31,11 +31,13 @@ import java.util.zip.DeflaterOutputStream;
 import java.net.URLEncoder;
 
 import javax.swing.BoxLayout;
+import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JEditorPane;
 import javax.swing.JLabel;
+import javax.swing.JList;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -47,6 +49,7 @@ import javax.swing.JTabbedPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
+import javax.swing.border.LineBorder;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter;
@@ -108,7 +111,6 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     //private JCheckBox aggressiveMode;
     private JCheckBox verboseModeManualTesting;
     private JCheckBox addManualIssueToScannerResultManualTesting;
-    private EnumMap<Transformation, JCheckBox> checkBoxesManualTesting = new EnumMap<Transformation, JCheckBox>(Transformation.class);
     private JButton attackButtonManualTesting;
     
     private JPanel mainPanelExploiting;
@@ -126,6 +128,11 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     
     private JComboBox<String> typeManualTest;
     private JComboBox<String> typeExpoitation;
+    
+    private DefaultListModel<Transformation> transformationsListModel;
+    private JList transformationsList;
+    private DefaultListModel<Transformation> addedTransformationsManualTestingListModel;
+    private JList addedTransformationsManualTestingList;
         
     private JPanel mainPanelConfiguration;
     
@@ -202,6 +209,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         
     /*
      * TODO
+     * - ZLIB in automatic scanner?
      * - Add Base64+URL to automatic scanner
      * - Add pane in which choose order of compressions and transformations
      * - Fix issue vector location (seems to be correct)
@@ -422,8 +430,45 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                 
                 JButton clearButtonManualTesting = new JButton("Clear Insertion Point");
                 clearButtonManualTesting.setActionCommand("clear");
-                clearButtonManualTesting.addActionListener(BurpExtender.this);   
+                clearButtonManualTesting.addActionListener(BurpExtender.this);
+                                
+                transformationsListModel = new DefaultListModel<Transformation>();                
+                JPanel manualTestingTranformationListPanel = new JPanel();
+                manualTestingTranformationListPanel.setLayout(new BoxLayout(manualTestingTranformationListPanel, BoxLayout.X_AXIS)); 
+                JLabel labelTransformationsList = new JLabel("Encode/Compress: ");
+                transformationsList = new JList(transformationsListModel);    
+                JScrollPane transformationsListScrollPane = new JScrollPane(transformationsList);
+                transformationsListScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+                transformationsListScrollPane.setBorder(new LineBorder(Color.BLACK));
+                transformationsListScrollPane.setMaximumSize( transformationsListScrollPane.getPreferredSize() );
                 
+                for (Transformation t : Transformation.values()) {
+                	transformationsListModel.addElement(t);
+                }
+                
+                JPanel manualTestingTranformationButtonPanel = new JPanel();
+                manualTestingTranformationButtonPanel.setLayout(new BoxLayout(manualTestingTranformationButtonPanel, BoxLayout.Y_AXIS));
+                JButton addTransformationManualTestingButton = new JButton("Add -->");
+                addTransformationManualTestingButton.setActionCommand("addTransformationManualTesting");
+                addTransformationManualTestingButton.addActionListener(BurpExtender.this);
+                JButton removeTransformationManualTestingButton = new JButton("<-- Remove");
+                removeTransformationManualTestingButton.setActionCommand("removeTransformationManualTesting");
+                removeTransformationManualTestingButton.addActionListener(BurpExtender.this);                
+                manualTestingTranformationButtonPanel.add(addTransformationManualTestingButton);
+                manualTestingTranformationButtonPanel.add(removeTransformationManualTestingButton);
+                
+                addedTransformationsManualTestingListModel = new DefaultListModel<Transformation>();  
+                addedTransformationsManualTestingList = new JList(addedTransformationsManualTestingListModel);    
+                JScrollPane addedTransformationsManualTestingListScrollPane = new JScrollPane(addedTransformationsManualTestingList);
+                addedTransformationsManualTestingListScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+                addedTransformationsManualTestingListScrollPane.setBorder(new LineBorder(Color.BLACK));
+                addedTransformationsManualTestingListScrollPane.setMaximumSize( addedTransformationsManualTestingListScrollPane.getPreferredSize() );
+                
+                manualTestingTranformationListPanel.add(labelTransformationsList);
+                manualTestingTranformationListPanel.add(transformationsListScrollPane);
+                manualTestingTranformationListPanel.add(manualTestingTranformationButtonPanel);
+                manualTestingTranformationListPanel.add(addedTransformationsManualTestingListScrollPane);
+                      
                 // Type of test
                 typeManualTest = new JComboBox<String>(TEST_TYPES);
                 typeManualTest.setSelectedIndex(0);
@@ -433,24 +478,19 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                 buttonPanelGenericManualTesting.add(setInsertionPointButtonManualTesting);
                 buttonPanelGenericManualTesting.add(clearButtonManualTesting);
                 buttonPanelGenericManualTesting.add(typeManualTest);
-                                
-                JPanel buttonPanelManualTesting = new JPanel();
-                buttonPanelManualTesting.setLayout(new BoxLayout(buttonPanelManualTesting, BoxLayout.X_AXIS));                                
-                for (Transformation t : Transformation.values()) {
-                    JCheckBox cb = new JCheckBox(t.toString());
-                    buttonPanelManualTesting.add(cb);
-                    checkBoxesManualTesting.put(t, cb);
-                }
-
+               
                 attackButtonManualTesting = new JButton("Attack");
                 attackButtonManualTesting.setActionCommand("attack");
                 attackButtonManualTesting.addActionListener(BurpExtender.this);  
-                buttonPanelManualTesting.add(attackButtonManualTesting);
+                //buttonPanelManualTesting.add(attackButtonManualTesting);
                 
                 leftPanelManualTesting.add(httpServicePanelManualTesting);
                 leftPanelManualTesting.add(scrollRequestAreaManualTesting);
                 leftPanelManualTesting.add(buttonPanelGenericManualTesting);
-                leftPanelManualTesting.add(buttonPanelManualTesting);   
+  
+                leftPanelManualTesting.add(manualTestingTranformationListPanel);
+                
+                leftPanelManualTesting.add(attackButtonManualTesting);
                 
                 splitPaneManualTesting.setLeftComponent(leftPanelManualTesting);                
                 
@@ -1417,14 +1457,16 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 			if(((String)(typeManualTest.getSelectedItem())).equals(BurpExtender.TEST_CPU)) {	
 				choice = JOptionPane.showOptionDialog(mainPanel, dialogMessage, dialogTitle, JOptionPane.YES_NO_OPTION, JOptionPane.INFORMATION_MESSAGE, null, dialogButtonsMessages, dialogButtonsMessages[1]);
 			}
-
-			final EnumSet<Transformation> ts = EnumSet.noneOf(Transformation.class);
-			for (Map.Entry<Transformation, JCheckBox> e : checkBoxesManualTesting.entrySet()) {
-				if (e.getValue().isSelected()) ts.add(e.getKey());
-			}
 			
+			final List<Transformation> ts = new ArrayList<Transformation>();
+			
+			for(int i=0; i<addedTransformationsManualTestingListModel.getSize();i++) {
+				
+				ts.add(addedTransformationsManualTestingListModel.getElementAt(i));			
+								
+			}	
+						
 			if(choice == 0 ){
-
 
 				Thread t = new Thread() {
 				    public void run() {
@@ -1523,7 +1565,35 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 	            }
 			});
 					
-		} 
+		} else if (command.equals("addTransformationManualTesting")) {
+			
+			SwingUtilities.invokeLater(new Runnable() {
+				
+	            @Override
+	            public void run() {
+	            		            	
+	            	int index = transformationsList.getSelectedIndex();
+	            	addedTransformationsManualTestingListModel.addElement(transformationsListModel.elementAt(index));
+					
+	            }
+			});		
+			
+		} else if (command.equals("removeTransformationManualTesting")) {
+			
+			SwingUtilities.invokeLater(new Runnable() {
+				
+	            @Override
+	            public void run() {
+	            		            	
+	            	int index = addedTransformationsManualTestingList.getSelectedIndex();
+	            	if(index != -1) {
+	            		addedTransformationsManualTestingListModel.remove(index);
+	            	}
+	            						
+	            }
+			});		
+			
+		}
 			
 		
 	}	
@@ -1713,7 +1783,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 	}	
 	
 	
-	public void executeManualTest(EnumSet<Transformation> transformations, String testType) {
+	public void executeManualTest(List<Transformation> transformations, String testType) {
 		
 		attackButtonManualTesting.setEnabled(false);
 		
@@ -1795,6 +1865,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     			
     			request = currentPayloads.get(currentKey);
     			for (Transformation t : transformations) {
+    				//stdout.println("Applying transformation " + t.toString());
     				try {
     					request = t.transform(request);
     				} catch (Exception e) {
