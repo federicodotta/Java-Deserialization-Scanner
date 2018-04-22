@@ -121,13 +121,11 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     private IMessageEditor resultAreaExploitingTopRequest;
     private IMessageEditor resultAreaExploitingTopResponse;
     private JButton attackButtonExploiting;
-    private JButton attackBase64ButtonExploiting;  
-    private JButton attackAsciiHexButtonExploiting;
-    private JButton attackBase64GzipButtonExploiting;
-    private JButton attackGzipButtonExploiting;
     private JTextArea resultAreaExploitingBottom;
+    private EnumMap<Transformation, JCheckBox> checkBoxesExploitation = new EnumMap<Transformation, JCheckBox>(Transformation.class);
     
     private JComboBox<String> typeManualTest;
+    private JComboBox<String> typeExpoitation;
         
     private JPanel mainPanelConfiguration;
     
@@ -204,6 +202,8 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         
     /*
      * TODO
+     * - Add Base64+URL to automatic scanner
+     * - Add pane in which choose order of compressions and transformations
      * - Fix issue vector location (seems to be correct)
      * - Check timoeout Burp in CPU payload
      * - This version active check for Deserialization Vulnerability IF AND ONLY IF
@@ -554,36 +554,25 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                 JScrollPane scrollRequestAreaExploitingBottom = new JScrollPane(requestAreaExploitingBottom);
                 scrollRequestAreaExploitingBottom.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
                 requestAreaExploitingBottom.setLineWrap(true);
-                requestAreaExploitingBottom.setText("CommonsCollections1 COMMAND");                
+                requestAreaExploitingBottom.setText("CommonsCollections1 COMMAND");
+                
+                // Type of test
+                typeExpoitation = new JComboBox<String>(TEST_TYPES);
+                typeExpoitation.setSelectedIndex(0);
+                typeExpoitation.addActionListener(BurpExtender.this);
+                typeExpoitation.setMaximumSize(typeExpoitation.getPreferredSize());
                 
                 JPanel buttonPanelExploitingBottom = new JPanel();
-                buttonPanelExploitingBottom.setLayout(new BoxLayout(buttonPanelExploitingBottom, BoxLayout.X_AXIS));
-                                
+                buttonPanelExploitingBottom.setLayout(new BoxLayout(buttonPanelExploitingBottom, BoxLayout.X_AXIS));                                
+                for (Transformation t : Transformation.values()) {
+                    JCheckBox cb = new JCheckBox(t.toString());
+                    buttonPanelExploitingBottom.add(cb);
+                    checkBoxesExploitation.put(t, cb);
+                }
                 attackButtonExploiting = new JButton("Attack");
                 attackButtonExploiting.setActionCommand("attackExploitation");
-                attackButtonExploiting.addActionListener(BurpExtender.this);  
-                
-                attackBase64ButtonExploiting = new JButton("Attack Base64");
-                attackBase64ButtonExploiting.setActionCommand("attackBase64Exploitation");
-                attackBase64ButtonExploiting.addActionListener(BurpExtender.this);  
-                
-                attackAsciiHexButtonExploiting = new JButton("Attack Ascii HEX");
-                attackAsciiHexButtonExploiting.setActionCommand("attackAsciiHexButtonExploiting");
-                attackAsciiHexButtonExploiting.addActionListener(BurpExtender.this); 
-
-                attackBase64GzipButtonExploiting = new JButton("Attack Base64 Gzip");
-                attackBase64GzipButtonExploiting.setActionCommand("attackBase64GzipButtonExploiting");
-                attackBase64GzipButtonExploiting.addActionListener(BurpExtender.this);
-
-                attackGzipButtonExploiting = new JButton("Attack Gzip");
-                attackGzipButtonExploiting.setActionCommand("attackGzipButtonExploiting");
-                attackGzipButtonExploiting.addActionListener(BurpExtender.this);                   
-                
+                attackButtonExploiting.addActionListener(BurpExtender.this); 
                 buttonPanelExploitingBottom.add(attackButtonExploiting);
-                buttonPanelExploitingBottom.add(attackBase64ButtonExploiting);
-                buttonPanelExploitingBottom.add(attackAsciiHexButtonExploiting);
-                buttonPanelExploitingBottom.add(attackBase64GzipButtonExploiting);
-                buttonPanelExploitingBottom.add(attackGzipButtonExploiting);
                 
                 leftBottomPanelExploiting.add(labelExploitingBottom);
                 leftBottomPanelExploiting.add(scrollRequestAreaExploitingBottom);
@@ -1475,51 +1464,19 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 			sendToDeserializationTester(hostExploiting,portExploiting,useHttpsExploiting,requestAreaExploitingTop);
 					
 		} else if(command.equals("attackExploitation")) {
+			
+			final EnumSet<Transformation> ts = EnumSet.noneOf(Transformation.class);
+			for (Map.Entry<Transformation, JCheckBox> e : checkBoxesExploitation.entrySet()) {
+				if (e.getValue().isSelected()) ts.add(e.getKey());
+			}
 						
 			Thread t = new Thread() {
 			    public void run() {
-			    	attackExploitation(BurpExtender.TYPE_RAW);
+			    	attackExploitation(ts, BurpExtender.TYPE_RAW);
 			    }
 			};
 			t.start();			
-			
-			
-		} else if(command.equals("attackBase64Exploitation")) {
-			
-			Thread t = new Thread() {
-			    public void run() {
-			    	attackExploitation(BurpExtender.TYPE_BASE64);
-			    }
-			};
-			t.start();		
-			
-		} else if(command.equals("attackAsciiHexButtonExploiting")) {
-			
-			Thread t = new Thread() {
-			    public void run() {
-			    	attackExploitation(BurpExtender.TYPE_ASCII_HEX);
-			    }
-			};
-			t.start();		
-			
-		} else if(command.equals("attackBase64GzipButtonExploiting")) {
-            
-            Thread t = new Thread() {
-                public void run() {
-                    attackExploitation(BurpExtender.TYPE_BASE64GZIP);
-                }
-            };
-            t.start();      
-            
-        } else if(command.equals("attackGzipButtonExploiting")) {
-            
-            Thread t = new Thread() {
-                public void run() {
-                    attackExploitation(BurpExtender.TYPE_GZIP);
-                }
-            };
-            t.start();      
-            
+   
         } else if(command.equals("sendRepeaterManualTesting")) {
 			
 			callbacks.sendToRepeater(hostManualTesting.getText().trim(), Integer.parseInt(portManualTesting.getText().trim()), useHttpsManualTesting.isSelected(), requestAreaManualTesting.getText().getBytes(), null);
@@ -1688,13 +1645,9 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 		
 	}
 	
-	public void attackExploitation(int encoding) {		
+	public void attackExploitation(EnumSet<Transformation> transformations, int encoding) {		
 		
 		attackButtonExploiting.setEnabled(false);
-		attackBase64ButtonExploiting.setEnabled(false);
-		attackAsciiHexButtonExploiting.setEnabled(false);
-        attackBase64GzipButtonExploiting.setEnabled(false);
-        attackGzipButtonExploiting.setEnabled(false);
 		
 		String requestString = requestAreaExploitingTop.getText();
 		int payloadFrom = requestString.indexOf(insertionPointChar);
@@ -1712,19 +1665,17 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 			if(payloadYSoSerial != null) {
 				
 				byte[] request;
-    			
-    			if(encoding == BurpExtender.TYPE_RAW) {
-    				request = ArrayUtils.addAll(prePayloadRequest,payloadYSoSerial);
-    			} else if(encoding == BurpExtender.TYPE_BASE64) {
-    				request = ArrayUtils.addAll(prePayloadRequest,Base64.encodeBase64URLSafe(payloadYSoSerial));
-    			} else if(encoding == BurpExtender.TYPE_ASCII_HEX) {
-    				request = ArrayUtils.addAll(prePayloadRequest,Hex.encodeHexString(payloadYSoSerial).getBytes());
-    			} else if(encoding == BurpExtender.TYPE_BASE64GZIP) {
-                    request = ArrayUtils.addAll(prePayloadRequest,URLEncoder.encode(new String(Base64.encodeBase64(gzipData(payloadYSoSerial)))).getBytes());
-                } else {
-                    request = ArrayUtils.addAll(prePayloadRequest,gzipData(payloadYSoSerial));
-                }
 				
+				request = payloadYSoSerial;
+    			for (Transformation t : transformations) {
+    				try {
+    					request = t.transform(request);
+    				} catch (Exception e) {
+    					stderr.println("Error while trying to " + t.toString() + " - " + e.getMessage());
+    					request = ("ERROR in " + t.toString()).getBytes();
+    				}
+    			}
+    			request = ArrayUtils.addAll(prePayloadRequest, request);
     			request = ArrayUtils.addAll(request,postPayloadRequest);
     			
     			IRequestInfo requestInfo = helpers.analyzeRequest(request);
@@ -1758,10 +1709,6 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 		}
 		
 		attackButtonExploiting.setEnabled(true);
-		attackBase64ButtonExploiting.setEnabled(true);
-		attackAsciiHexButtonExploiting.setEnabled(true);
-        attackBase64GzipButtonExploiting.setEnabled(true);
-        attackGzipButtonExploiting.setEnabled(true);
 		
 	}	
 	
