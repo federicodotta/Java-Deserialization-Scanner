@@ -16,12 +16,9 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.EnumMap;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.concurrent.TimeUnit;
@@ -124,15 +121,18 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     private IMessageEditor resultAreaExploitingTopResponse;
     private JButton attackButtonExploiting;
     private JTextArea resultAreaExploitingBottom;
-    private EnumMap<Transformation, JCheckBox> checkBoxesExploitation = new EnumMap<Transformation, JCheckBox>(Transformation.class);
     
     private JComboBox<String> typeManualTest;
-    private JComboBox<String> typeExpoitation;
     
-    private DefaultListModel<Transformation> transformationsListModel;
-    private JList transformationsList;
+    private DefaultListModel<Transformation> transformationsListManualTestingModel;
+    private JList transformationsManualTestingList;
     private DefaultListModel<Transformation> addedTransformationsManualTestingListModel;
     private JList addedTransformationsManualTestingList;
+    
+    private DefaultListModel<Transformation> transformationsListExploitationModel;
+    private JList transformationsExploitationList;
+    private DefaultListModel<Transformation> addedTransformationsExploitationListModel;
+    private JList addedTransformationsExploitationList;
         
     private JPanel mainPanelConfiguration;
     
@@ -432,18 +432,18 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                 clearButtonManualTesting.setActionCommand("clear");
                 clearButtonManualTesting.addActionListener(BurpExtender.this);
                                 
-                transformationsListModel = new DefaultListModel<Transformation>();                
+                transformationsListManualTestingModel = new DefaultListModel<Transformation>();                
                 JPanel manualTestingTranformationListPanel = new JPanel();
                 manualTestingTranformationListPanel.setLayout(new BoxLayout(manualTestingTranformationListPanel, BoxLayout.X_AXIS)); 
                 JLabel labelTransformationsList = new JLabel("Encode/Compress: ");
-                transformationsList = new JList(transformationsListModel);    
-                JScrollPane transformationsListScrollPane = new JScrollPane(transformationsList);
+                transformationsManualTestingList = new JList(transformationsListManualTestingModel);    
+                JScrollPane transformationsListScrollPane = new JScrollPane(transformationsManualTestingList);
                 transformationsListScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
                 transformationsListScrollPane.setBorder(new LineBorder(Color.BLACK));
                 transformationsListScrollPane.setMaximumSize( transformationsListScrollPane.getPreferredSize() );
                 
                 for (Transformation t : Transformation.values()) {
-                	transformationsListModel.addElement(t);
+                	transformationsListManualTestingModel.addElement(t);
                 }
                 
                 JPanel manualTestingTranformationButtonPanel = new JPanel();
@@ -482,7 +482,6 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                 attackButtonManualTesting = new JButton("Attack");
                 attackButtonManualTesting.setActionCommand("attack");
                 attackButtonManualTesting.addActionListener(BurpExtender.this);  
-                //buttonPanelManualTesting.add(attackButtonManualTesting);
                 
                 leftPanelManualTesting.add(httpServicePanelManualTesting);
                 leftPanelManualTesting.add(scrollRequestAreaManualTesting);
@@ -579,8 +578,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                 leftTopPanelExploiting.add(scrollRequestAreaExploiting);
                 leftTopPanelExploiting.add(buttonPanelExploiting);            
                 
-                leftSplitPaneExploiting.setTopComponent(leftTopPanelExploiting);
-                
+                leftSplitPaneExploiting.setTopComponent(leftTopPanelExploiting);           
                    
                 
                 // LEFT BOTTOM
@@ -596,27 +594,51 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                 requestAreaExploitingBottom.setLineWrap(true);
                 requestAreaExploitingBottom.setText("CommonsCollections1 COMMAND");
                 
-                // Type of test
-                typeExpoitation = new JComboBox<String>(TEST_TYPES);
-                typeExpoitation.setSelectedIndex(0);
-                typeExpoitation.addActionListener(BurpExtender.this);
-                typeExpoitation.setMaximumSize(typeExpoitation.getPreferredSize());
+                transformationsListExploitationModel = new DefaultListModel<Transformation>();                
+                JPanel exploitationTranformationListPanel = new JPanel();
+                exploitationTranformationListPanel.setLayout(new BoxLayout(exploitationTranformationListPanel, BoxLayout.X_AXIS)); 
+                //JLabel labelTransformationsList = new JLabel("Encode/Compress: ");
+                transformationsExploitationList = new JList(transformationsListExploitationModel);    
+                JScrollPane transformationsListExploitationScrollPane = new JScrollPane(transformationsExploitationList);
+                transformationsListExploitationScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+                transformationsListExploitationScrollPane.setBorder(new LineBorder(Color.BLACK));
+                transformationsListExploitationScrollPane.setMaximumSize( transformationsListExploitationScrollPane.getPreferredSize() );
                 
-                JPanel buttonPanelExploitingBottom = new JPanel();
-                buttonPanelExploitingBottom.setLayout(new BoxLayout(buttonPanelExploitingBottom, BoxLayout.X_AXIS));                                
                 for (Transformation t : Transformation.values()) {
-                    JCheckBox cb = new JCheckBox(t.toString());
-                    buttonPanelExploitingBottom.add(cb);
-                    checkBoxesExploitation.put(t, cb);
+                	transformationsListExploitationModel.addElement(t);
                 }
+                
+                JPanel exploitationTranformationButtonPanel = new JPanel();
+                exploitationTranformationButtonPanel.setLayout(new BoxLayout(exploitationTranformationButtonPanel, BoxLayout.Y_AXIS));
+                JButton addTransformationExploitationButton = new JButton("Add -->");
+                addTransformationExploitationButton.setActionCommand("addTransformationExploitation");
+                addTransformationExploitationButton.addActionListener(BurpExtender.this);
+                JButton removeTransformationExploitationButton = new JButton("<-- Remove");
+                removeTransformationExploitationButton.setActionCommand("removeTransformationExploitation");
+                removeTransformationExploitationButton.addActionListener(BurpExtender.this);                
+                exploitationTranformationButtonPanel.add(addTransformationExploitationButton);
+                exploitationTranformationButtonPanel.add(removeTransformationExploitationButton);
+                
+                addedTransformationsExploitationListModel = new DefaultListModel<Transformation>();  
+                addedTransformationsExploitationList = new JList(addedTransformationsExploitationListModel);    
+                JScrollPane addedTransformationsExploitationListScrollPane = new JScrollPane(addedTransformationsExploitationList);
+                addedTransformationsExploitationListScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+                addedTransformationsExploitationListScrollPane.setBorder(new LineBorder(Color.BLACK));
+                addedTransformationsExploitationListScrollPane.setMaximumSize( addedTransformationsExploitationListScrollPane.getPreferredSize() );
+                
+                exploitationTranformationListPanel.add(labelTransformationsList);
+                exploitationTranformationListPanel.add(transformationsListExploitationScrollPane);
+                exploitationTranformationListPanel.add(exploitationTranformationButtonPanel);
+                exploitationTranformationListPanel.add(addedTransformationsExploitationListScrollPane);
+                                
                 attackButtonExploiting = new JButton("Attack");
                 attackButtonExploiting.setActionCommand("attackExploitation");
                 attackButtonExploiting.addActionListener(BurpExtender.this); 
-                buttonPanelExploitingBottom.add(attackButtonExploiting);
                 
                 leftBottomPanelExploiting.add(labelExploitingBottom);
                 leftBottomPanelExploiting.add(scrollRequestAreaExploitingBottom);
-                leftBottomPanelExploiting.add(buttonPanelExploitingBottom);
+                leftBottomPanelExploiting.add(exploitationTranformationListPanel);
+                leftBottomPanelExploiting.add(attackButtonExploiting);
                 
                 leftSplitPaneExploiting.setBottomComponent(leftBottomPanelExploiting);
                 
@@ -1506,11 +1528,14 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 			sendToDeserializationTester(hostExploiting,portExploiting,useHttpsExploiting,requestAreaExploitingTop);
 					
 		} else if(command.equals("attackExploitation")) {
+						
+			final List<Transformation> ts = new ArrayList<Transformation>();
 			
-			final EnumSet<Transformation> ts = EnumSet.noneOf(Transformation.class);
-			for (Map.Entry<Transformation, JCheckBox> e : checkBoxesExploitation.entrySet()) {
-				if (e.getValue().isSelected()) ts.add(e.getKey());
-			}
+			for(int i=0; i<addedTransformationsExploitationListModel.getSize();i++) {
+				
+				ts.add(addedTransformationsExploitationListModel.getElementAt(i));			
+								
+			}	
 						
 			Thread t = new Thread() {
 			    public void run() {
@@ -1572,8 +1597,8 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 	            @Override
 	            public void run() {
 	            		            	
-	            	int index = transformationsList.getSelectedIndex();
-	            	addedTransformationsManualTestingListModel.addElement(transformationsListModel.elementAt(index));
+	            	int index = transformationsManualTestingList.getSelectedIndex();
+	            	addedTransformationsManualTestingListModel.addElement(transformationsListManualTestingModel.elementAt(index));
 					
 	            }
 			});		
@@ -1593,8 +1618,35 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 	            }
 			});		
 			
-		}
+		} else if (command.equals("addTransformationExploitation")) {
 			
+			SwingUtilities.invokeLater(new Runnable() {
+				
+	            @Override
+	            public void run() {
+	            		            	
+	            	int index = transformationsExploitationList.getSelectedIndex();
+	            	addedTransformationsExploitationListModel.addElement(transformationsListExploitationModel.elementAt(index));
+					
+	            }
+			});		
+			
+		} else if (command.equals("removeTransformationExploitation")) {
+			
+			SwingUtilities.invokeLater(new Runnable() {
+				
+	            @Override
+	            public void run() {
+	            		            	
+	            	int index = addedTransformationsExploitationList.getSelectedIndex();
+	            	if(index != -1) {
+	            		addedTransformationsExploitationListModel.remove(index);
+	            	}
+	            						
+	            }
+			});		
+			
+		}
 		
 	}	
 	
@@ -1715,7 +1767,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 		
 	}
 	
-	public void attackExploitation(EnumSet<Transformation> transformations, int encoding) {		
+	public void attackExploitation(List<Transformation> transformations, int encoding) {		
 		
 		attackButtonExploiting.setEnabled(false);
 		
