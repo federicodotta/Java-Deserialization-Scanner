@@ -335,7 +335,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         insertionPointChar = (char)167;   
         
         dialogTitle = "Are you sure?";
-        dialogMessage = "The execution of this payload can cause high CPU consumtion for various seconds/minutes and it may causes DoS on older services and high loaded services. DO NOT send simultaneous requests to the same server.";
+        dialogMessage = "The execution of this payload can cause high CPU consumption for various seconds/minutes and it may causes DoS on older services and high loaded services. DO NOT send simultaneous requests to the same server.";
         dialogButtonsMessages = new String[]{ "Yes", "Cancel" }; 
         
         urlBodyAlreadyScanned = new ArrayList<String>();
