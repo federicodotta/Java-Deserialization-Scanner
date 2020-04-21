@@ -222,7 +222,6 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
      * points...)
      */    
     
-    @Override
     public void registerExtenderCallbacks(final IBurpExtenderCallbacks callbacks)
     {
         // Keep a reference to our callbacks object
@@ -371,7 +370,6 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         
         SwingUtilities.invokeLater(new Runnable() 
         {
-            @Override
             public void run()
             {
             	            	
@@ -782,7 +780,6 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     }
     
     
-    @Override
     public List<IScanIssue> doPassiveScan(IHttpRequestResponse baseRequestResponse) {
     	    	
     	List<IScanIssue> issues = new ArrayList<IScanIssue>();
@@ -1072,7 +1069,6 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 
     }
 
-    @Override
     public List<IScanIssue> doActiveScan(IHttpRequestResponse baseRequestResponse, IScannerInsertionPoint insertionPoint) {
     	    	    	
     	List<IScanIssue> issues = new ArrayList<IScanIssue>();
@@ -1358,7 +1354,6 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 
     }
 
-    @Override
     public int consolidateDuplicateIssues(IScanIssue existingIssue, IScanIssue newIssue) {
     	
         if (existingIssue.getIssueName().equals(newIssue.getIssueName())) {
@@ -1456,19 +1451,16 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     }
 
 
-	@Override
 	public String getTabCaption() {
 		return "Deserialization Scanner";
 	}
 
 
-	@Override
 	public Component getUiComponent() {
 		return mainPanel;
 	}
 
 
-	@Override
 	public void actionPerformed(ActionEvent event) {
 
 		String command = event.getActionCommand();
@@ -1552,7 +1544,6 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 			
 			SwingUtilities.invokeLater(new Runnable() {
 				
-	            @Override
 	            public void run() {
 			
 					hostExploiting.setText(hostManualTesting.getText().trim());
@@ -1575,7 +1566,6 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 			
 			SwingUtilities.invokeLater(new Runnable() {
 				
-	            @Override
 	            public void run() {
 	            	
 	            	hostManualTesting.setText(hostExploiting.getText().trim());
@@ -1594,7 +1584,6 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 			
 			SwingUtilities.invokeLater(new Runnable() {
 				
-	            @Override
 	            public void run() {
 	            		            	
 	            	int index = transformationsManualTestingList.getSelectedIndex();
@@ -1607,7 +1596,6 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 			
 			SwingUtilities.invokeLater(new Runnable() {
 				
-	            @Override
 	            public void run() {
 	            		            	
 	            	int index = addedTransformationsManualTestingList.getSelectedIndex();
@@ -1622,7 +1610,6 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 			
 			SwingUtilities.invokeLater(new Runnable() {
 				
-	            @Override
 	            public void run() {
 	            		            	
 	            	int index = transformationsExploitationList.getSelectedIndex();
@@ -1635,7 +1622,6 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 			
 			SwingUtilities.invokeLater(new Runnable() {
 				
-	            @Override
 	            public void run() {
 	            		            	
 	            	int index = addedTransformationsExploitationList.getSelectedIndex();
@@ -2083,7 +2069,6 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 		
 	}
 
-	@Override
 	public List<JMenuItem> createMenuItems(IContextMenuInvocation invocation) {
 		
 		selectedItems = invocation.getSelectedMessages();		
@@ -2104,20 +2089,14 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 		return menu;
 	}
 
-
-	@Override
 	public IHttpService getHttpService() {
 		return currentExploitationRequestResponse.getHttpService();
 	}
 
-
-	@Override
 	public byte[] getRequest() {
 		return currentExploitationRequestResponse.getRequest();
 	}
 
-
-	@Override
 	public byte[] getResponse() {
 		return currentExploitationRequestResponse.getResponse();
 	}

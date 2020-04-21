@@ -34,67 +34,56 @@ public class CustomScanIssue implements IScanIssue {
         this.remediationDetail = remediationDetail;        
     }
     
-    @Override
     public URL getUrl()
     {
         return url;
     }
 
-    @Override
     public String getIssueName()
     {
         return name;
     }
 
-    @Override
     public int getIssueType()
     {
         return 0;
     }
 
-    @Override
     public String getSeverity()
     {
         return severity;
     }
 
-    @Override
     public String getConfidence()
     {
         return confidence;
     }
 
-    @Override
     public String getIssueBackground()
     {
         return null;
     }
 
-    @Override
     public String getRemediationBackground()
     {
         return null;
     }
 
-    @Override
     public String getIssueDetail()
     {
         return issueDetail;
     }
 
-    @Override
     public String getRemediationDetail()
     {
         return remediationDetail;
     }
 
-    @Override
     public IHttpRequestResponse[] getHttpMessages()
     {
         return httpMessages;
     }
 
-    @Override
     public IHttpService getHttpService()
     {
         return httpService;
