@@ -111,6 +111,8 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     private JCheckBox verboseModeManualTesting;
     private JCheckBox addManualIssueToScannerResultManualTesting;
     private JButton attackButtonManualTesting;
+    private JCheckBox enableExploitationHibernate5;
+    private JLabel labelExploitingBottom;
     
     private JPanel mainPanelExploiting;
     private JSplitPane splitPaneExploiting;
@@ -589,7 +591,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                 JPanel leftBottomPanelExploiting = new JPanel();
                 leftBottomPanelExploiting.setLayout(new BoxLayout(leftBottomPanelExploiting, BoxLayout.Y_AXIS));
                 
-                JLabel labelExploitingBottom = new JLabel("java -jar ysoserial"); 
+                labelExploitingBottom = new JLabel("java -jar ysoserial"); 
                 
                 requestAreaExploitingBottom = new JTextArea();
                 JScrollPane scrollRequestAreaExploitingBottom = new JScrollPane(requestAreaExploitingBottom);
@@ -757,10 +759,15 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                 JLabel labelConfigurationPaneYsoserialPath = new JLabel("Ysoserial path: ");
                 ysoserialPath = new JTextField(200);                
                 ysoserialPath.setText("ysoserial-0.0.4-all.jar");
-
                 ysoserialPath.setMaximumSize( ysoserialPath.getPreferredSize() );
                 configurationPaneButtonJPanel.add(labelConfigurationPaneYsoserialPath);
                 configurationPaneButtonJPanel.add(ysoserialPath);
+                
+                enableExploitationHibernate5 = new JCheckBox("Execute ysoserial with hibernate5 profile (-Dhibernate5)");
+                enableExploitationHibernate5.setSelected(false);
+                enableExploitationHibernate5.setActionCommand("changeExploitationLabel");
+                enableExploitationHibernate5.addActionListener(BurpExtender.this);
+                enableExploitationHibernate5.setAlignmentX(Component.LEFT_ALIGNMENT);
                 
                 mainPanelConfiguration.add(configurationTitleScanner);
                 mainPanelConfiguration.add(enableActiveScanSleepChecks);
@@ -773,7 +780,8 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                 mainPanelConfiguration.add(verboseModeManualTesting);
                 mainPanelConfiguration.add(separatorConfigurationManualTesting);
                 mainPanelConfiguration.add(configurationTitleExploiting);    
-                mainPanelConfiguration.add(configurationPaneButtonJPanel);   
+                mainPanelConfiguration.add(configurationPaneButtonJPanel);
+                mainPanelConfiguration.add(enableExploitationHibernate5);   
 
                 callbacks.customizeUiComponent(mainPanelConfiguration);
                 
@@ -1564,8 +1572,23 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 			    	attackExploitation(ts, BurpExtender.TYPE_RAW);
 			    }
 			};
-			t.start();			
-   
+			t.start();	
+			
+		} else if(command.equals("changeExploitationLabel")) {	
+			
+			SwingUtilities.invokeLater(new Runnable() {
+				
+	            public void run() {
+			
+					if(enableExploitationHibernate5.isSelected())
+						labelExploitingBottom.setText("java -Dhibernate5 -jar ysoserial");
+					else
+						labelExploitingBottom.setText("java -jar ysoserial");
+					
+	            }
+	            
+			});
+			
         } else if(command.equals("sendRepeaterManualTesting")) {
 			
 			callbacks.sendToRepeater(hostManualTesting.getText().trim(), Integer.parseInt(portManualTesting.getText().trim()), useHttpsManualTesting.isSelected(), requestAreaManualTesting.getText().getBytes(), null);
@@ -1747,7 +1770,15 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 			String[] commandParts = translateCommandline(requestAreaExploitingBottom.getText().trim());
 			
 			Runtime rt = Runtime.getRuntime();
-			String[] commands = {"java","-Dhibernate5","-jar",pathYsoserial};
+			
+			String[] commands;
+			if(enableExploitationHibernate5.isSelected()) {
+				String[] temp = {"java","-Dhibernate5","-jar",pathYsoserial};
+				commands = temp;
+			} else {
+				String[] temp = {"java","-jar",pathYsoserial};
+				commands = temp;
+			}
 			String[] fullCommands = ArrayUtils.addAll(commands, commandParts);
 			Process proc = rt.exec(fullCommands);
 			
