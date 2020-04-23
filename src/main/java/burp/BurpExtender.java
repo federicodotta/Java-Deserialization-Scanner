@@ -82,20 +82,27 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     // This is necessary because these payloads requires further modifications
     private ArrayList<String> payloadsDNStemplateImpl;
     
-    private String activeScanIssue;
-    private String activeScanSeverity;
-    private String activeScanConfidence;
-    private String activeScanIssueDetail;
-    private String activeScanRemediationDetail;
-    
-    private String activeScanIssueVulnerableLibrary;
-    private String activeScanIssueDetailVulnerableLibrary;
+    private String rceIssue;
+    private String rceSeverity;
+    private String rceConfidenceSleep;
+    private String rceConfidenceDns;
+    private String rceIssueDetail;
+    private String rceIssueVulnerableLibrary;
+    private String rceIssueDetailVulnerableLibrary;
     
     private String passiveScanIssue;
     private String passiveScanSeverity;
     private String passiveScanConfidence;
     private String passiveScanIssueDetail;
-    private String passiveScanRemediationDetail; 
+    
+    private String activeDetectionIssue;
+    private String activeDetectionSeverity;
+    private String activeDetectionConfidenceDns;
+    private String activeDetectionConfidenceSleep;
+    private String activeDetectionIssueDetails;
+    
+    private String remediationDetail;
+    private String issueDetailTimeWarning;     
     
     private JPanel mainPanelManualTesting;
     private JSplitPane splitPaneManualTesting;
@@ -317,6 +324,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         payloadsDNStemplateImpl.add("Mozilla Rhino Alternate payload (DNS)");
         payloadsDNStemplateImpl.add("Vaadin (DNS)");
         
+        // Initialize the URLDNS payload, that executes a DNS resolution using JRE only functions, without the need of a vulnerable library
         payloadURLDNS = Base64.decodeBase64("rO0ABXNyABFqYXZhLnV0aWwuSGFzaE1hcAUH2sHDFmDRAwACRgAKbG9hZEZhY3RvckkACXRocmVzaG9sZHhwP0AAAAAAAAx3CAAAABAAAAABc3IADGphdmEubmV0LlVSTJYlNzYa/ORyAwAHSQAIaGFzaENvZGVJAARwb3J0TAAJYXV0aG9yaXR5dAASTGphdmEvbGFuZy9TdHJpbmc7TAAEZmlsZXEAfgADTAAEaG9zdHEAfgADTAAIcHJvdG9jb2xxAH4AA0wAA3JlZnEAfgADeHD//////////3QACFhYWFhYLml0dAAAcQB+AAV0AARodHRwcHh0AA9odHRwOi8vWFhYWFguaXR4");
         
         // Initialize the Serial Dos Limited payload (limited version of https://gist.github.com/coekie/a27cc406fc9f3dc7a70d)
@@ -325,24 +333,31 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         payloadSerialDosLimited = Base64.decodeBase64("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");
         
         // Initialize the descriptions of the vulnerabilities
-        activeScanIssue = "Java Unsafe Deserialization";
-        activeScanSeverity = "High";
-        activeScanConfidence = "Firm";
-        activeScanIssueDetail = "The application deserialize untrusted serialized Java objects,"+
-        						" without first checking the type of the received object. This issue can be"+
+        rceIssue = "Remote Code Execution through Java Unsafe Deserialization";
+        rceIssueVulnerableLibrary = ", vulnerable library: ";
+        rceSeverity = "High";
+        rceConfidenceSleep = "Firm";
+        rceConfidenceDns = "Certain";
+        rceIssueDetail = "The application deserializes untrusted serialized Java objects,"+
+        						" without first checking the type of the received object and run on an unpatched Java environment. This issue can be"+
         						" exploited by sending malicious objects that, when deserialized,"+
         						" execute custom Java code. Several objects defined in popular libraries"+
         						" can be used for the exploitation.";
-        activeScanRemediationDetail = "The best way to mitigate the present issue is to"+
-        							  " deserialize only known objects, by using custom "+
-        							  " objects for the deserialization, insted of the Java "+
-        							  " ObjectInputStream default one. The custom object must override the "+
-        							  " resolveClass method, by inserting checks on the object type"+
-        							  " before deserializing the received object. Furthermore, update the"+
-        							  " library used for the exploitation to the lastest release.";
+        rceIssueDetailVulnerableLibrary = " The present issue has been exploited thanks to the disclosed vulnerability on library ";
         
-        activeScanIssueVulnerableLibrary = ", vulnerable library: ";
-        activeScanIssueDetailVulnerableLibrary = " The present issue has been exploited thanks to the disclosed vulnerability on library ";
+        activeDetectionIssue = "Java Deserialization detected, active check based on ";
+        activeDetectionSeverity = "Medium";
+        activeDetectionConfidenceDns = "Certain";
+        activeDetectionConfidenceSleep = "Firm";
+        activeDetectionIssueDetails = "The application deserializes untrusted serialized Java objects. Most likely the application is vulnerable to Denial " + 
+                                      "of Service and if the type of the object is not checked before the deserialization process and/or the version of Java used" + 
+                                      " by the backend is not updated, the issue could also be exploited to achieve remote command execution. In order to execute " + 
+                                      "commands, it is necessary to find a vulnerable library. The Java Deserialization Scanner plugins executes many checks to" + 
+                                      " find libraries that can be used for exploitation (that, if found, are reported as \"High\" severity issues). If no " + 
+                                      "vulnerable libraries are detected by the plugin, GadgetProbe tool by Jake Miller can be used to enumerate libraries " + 
+                                      "used by the backend. Then Chris Frohoff's ysoserial tool can be used to generate payloads for known exploit chains " + 
+                                      "(integrated also in the \"Exploiting\" tab of the plugin) and Ian Haken's Gadget Inspector can be used to find 0-day " + 
+                                      "exploit chains in the Java libraries used by the target application. ";
         
         passiveScanIssue = "Serialized Java objects detected";
         passiveScanSeverity = "Information";
@@ -352,12 +367,20 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         						 " not check on the type of the received objects before"+
         						 " the deserialization phase, it may be vulnerable to the Java Deserialization"+
         						 " Vulnerability.";
-        passiveScanRemediationDetail = "The best way to mitigate the present issue is to"+
-				  					   " deserialize only known objects, by using custom "+
-				  					   " objects for the deserialization, insted of the Java "+
-				  					   " ObjectInputStream default one. The custom object must override the "+
-				  					   " resolveClass method, by inserting checks on the object type"+
-				  					   " before deserializing the received object.";  
+        
+        remediationDetail = "<ol><li>If possible, do not use Java serialized objects and migrate to safer alternatives.</li> " +  
+				  "<li>Keep Java software always updated and patched.</li>" + 
+				  "<li> If is necessary to use Serialized Java Objects, "+
+				  " deserialize only known objects, by using custom "+
+				  " objects for the deserialization, insted of the Java "+
+				  " ObjectInputStream default one. The custom object must override the "+
+				  " resolveClass method, by inserting checks on the object type"+
+				  " before deserializing the received object. </li>" +
+				  " <li>Update all Java libraries used in the application, with particular attention " +
+				  "to the one used for the exploitation.</li></ol>";
+        
+        issueDetailTimeWarning = "The issue has been reported as \"Firm\" instead of \"Certain\" because congested networks can cause false positives to time checks.";
+        
         
         insertionPointChar = (char)167;   
         
@@ -941,7 +964,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                             passiveScanSeverity,
                             passiveScanConfidence,
                             passiveScanIssueDetail,
-                            passiveScanRemediationDetail));
+                            remediationDetail));
                     }
                     
                 } catch (Exception ex) {
@@ -968,14 +991,14 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                         passiveScanSeverity,
                         passiveScanConfidence,
                         passiveScanIssueDetail,
-                        passiveScanRemediationDetail));
+                        remediationDetail));
             }
             
     	}
 
        	// THEN CHECK IN RESPONSE
     	
-        //Get response to check for potential Java serialised objects
+        //Get response to check for potential Java serialized objects
         byte[] response = baseRequestResponse.getResponse();
         
         magicPos = helpers.indexOf(response, serializeMagic, false, 0, response.length);
@@ -1074,7 +1097,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                             passiveScanSeverity,
                             passiveScanConfidence,
                             passiveScanIssueDetail,
-                            passiveScanRemediationDetail));
+                            remediationDetail));
                     }
                     
                 } catch (Exception ex) {
@@ -1101,7 +1124,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                         passiveScanSeverity,
                         passiveScanConfidence,
                         passiveScanIssueDetail,
-                        passiveScanRemediationDetail));
+                        remediationDetail));
             }
             
         }
@@ -1219,7 +1242,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         			List<int[]> requestMarkers = new ArrayList<int[]>();
         			int markerStart = 0;
         			int markerEnd = 0;
-        			String issueName = activeScanIssue + activeScanIssueVulnerableLibrary + currentKey;
+        			String issueEncoding = "";
         			
         			if(magicPos > -1) {
         				markerStart =  helpers.indexOf(newRequest, helpers.urlEncode(currentPayloads.get(currentKey)), false, 0, newRequest.length);
@@ -1227,17 +1250,17 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         			}else if(magicPosBase64 > -1) {
         				markerStart = helpers.indexOf(newRequest, Base64.encodeBase64URLSafe(currentPayloads.get(currentKey)), false, 0, newRequest.length);
         				markerEnd = markerStart + helpers.urlEncode(Base64.encodeBase64URLSafe(currentPayloads.get(currentKey))).length;
-        				issueName = issueName + " (encoded in Base64)";
+        				issueEncoding = issueEncoding + " (encoded in Base64)";
         			} else if(magicPosAsciiHex > -1) {
         				markerStart = helpers.indexOf(newRequest, Hex.encodeHexString(currentPayloads.get(currentKey)).getBytes(), false, 0, newRequest.length);
         				markerEnd = markerStart + helpers.urlEncode(Hex.encodeHexString(currentPayloads.get(currentKey)).getBytes()).length;
-        				issueName = issueName + " (encoded in Ascii HEX)";
+        				issueEncoding = issueEncoding + " (encoded in Ascii HEX)";
         			} else if(magicPosBase64Gzip > -1) {
                         //Need to use more comprehensive URL encoding as / doesn't get encoded
                         try {
                             markerStart = helpers.indexOf(newRequest, URLEncoder.encode(new String(Base64.encodeBase64(gzipData(currentPayloads.get(currentKey)))), "UTF-8").getBytes(), false, 0, newRequest.length);
                             markerEnd = markerStart + URLEncoder.encode(new String(Base64.encodeBase64(gzipData(currentPayloads.get(currentKey)))), "UTF-8").getBytes().length;
-                            issueName = issueName + " (encoded in Base64 and Gzipped)";
+                            issueEncoding = issueEncoding + " (encoded in Base64 and Gzipped)";
                         }
                         catch (Exception ex) {
                             stderr.println(ex.getMessage());
@@ -1245,20 +1268,38 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                     } else {
                         markerStart = helpers.indexOf(newRequest, gzipData(currentPayloads.get(currentKey)), false, 0, newRequest.length);
                         markerEnd = markerStart + helpers.urlEncode(gzipData(currentPayloads.get(currentKey))).length;
-                        issueName = issueName + " (encoded/compressed with Gzip)";
+                        issueEncoding = issueEncoding + " (encoded/compressed with Gzip)";
                     }    			
 
         			requestMarkers.add(new int[]{markerStart,markerEnd});
         			
-                    issues.add(new CustomScanIssue(
-                            baseRequestResponse.getHttpService(),
-                            helpers.analyzeRequest(baseRequestResponse).getUrl(), 
-                            new IHttpRequestResponse[] { callbacks.applyMarkers(checkRequestResponse, requestMarkers, new ArrayList<int[]>()) }, 
-                            issueName,
-                            activeScanSeverity,
-                            activeScanConfidence,
-                            activeScanIssueDetail + activeScanIssueDetailVulnerableLibrary + currentKey + ".",
-                            activeScanRemediationDetail));        		        			
+        			if(currentKey.equals("URLDNS")) {
+        				
+        				issues.add(new CustomScanIssue(
+                                baseRequestResponse.getHttpService(),
+                                helpers.analyzeRequest(baseRequestResponse).getUrl(), 
+                                new IHttpRequestResponse[] { callbacks.applyMarkers(checkRequestResponse, requestMarkers, new ArrayList<int[]>()) }, 
+                                activeDetectionIssue + "DNS resolution" + issueEncoding,
+                                activeDetectionSeverity,
+                                activeDetectionConfidenceDns,
+                                activeDetectionIssueDetails,
+                                remediationDetail));
+        				
+        			} else {
+        				
+        				issues.add(new CustomScanIssue(
+                                baseRequestResponse.getHttpService(),
+                                helpers.analyzeRequest(baseRequestResponse).getUrl(), 
+                                new IHttpRequestResponse[] { callbacks.applyMarkers(checkRequestResponse, requestMarkers, new ArrayList<int[]>()) }, 
+                                rceIssue + rceIssueVulnerableLibrary + currentKey + issueEncoding,
+                                rceSeverity,
+                                (currentKey.contains("Sleep")) ? rceConfidenceSleep : rceConfidenceDns,
+                                rceIssueDetail + rceIssueDetailVulnerableLibrary + currentKey + ". " + ((currentKey.contains("Sleep")) ? issueDetailTimeWarning : ""),
+                                remediationDetail));
+        				
+        			}
+        			
+                            		        			
         		}        		
     		}
     	}
@@ -1272,12 +1313,12 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
             magicPosAsciiHex = helpers.indexOf(request, asciiHexMagic, false, 0, request.length);
             magicPosBase64Gzip = helpers.indexOf(request, base64GzipMagic, false, 0, request.length);
             magicPosGzip = helpers.indexOf(request, gzipMagic, false, 0, request.length);
-            
-            // Add the url to the urlBodyAlreadyScanned arraylist in order to avoid duplicate scanning of the body
-        	urlBodyAlreadyScanned.add(requestInfo.getUrl().toExternalForm());
-
+           
             if((magicPos > -1 && magicPos == bodyOffset) || (magicPosBase64 > -1 && magicPosBase64 == bodyOffset) || (magicPosAsciiHex > -1 && magicPosAsciiHex == bodyOffset) || (magicPosBase64Gzip > -1 && magicPosBase64Gzip == bodyOffset) || (magicPosGzip > -1 && magicPosGzip == bodyOffset)) {
-                
+
+            	// Add the url to the urlBodyAlreadyScanned arraylist in order to avoid duplicate scanning of the body
+            	urlBodyAlreadyScanned.add(requestInfo.getUrl().toExternalForm());
+            	
     			// Collaborator context for DNS payloads
     			IBurpCollaboratorClientContext collaboratorContext = callbacks.createBurpCollaboratorClientContext();
                 
@@ -1373,33 +1414,49 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                        List<int[]> requestMarkers = new ArrayList<int[]>();
                         
                        int markerStartPos = 0;
-                       String issueName = activeScanIssue + activeScanIssueVulnerableLibrary + currentKey;
+                       String issueEncoding = "";
                        if(magicPos > -1) {
                            markerStartPos = helpers.indexOf(newRequest, serializeMagic, false, 0, newRequest.length);
                        } else if(magicPosBase64 > -1) {
                            markerStartPos = helpers.indexOf(newRequest, base64Magic, false, 0, newRequest.length);
-                           issueName = issueName + " (encoded in Base64)";
+                           issueEncoding = issueEncoding + " (encoded in Base64)";
                        } else if (magicPosAsciiHex > -1) {
                            markerStartPos = helpers.indexOf(newRequest, asciiHexMagic, false, 0, newRequest.length);
-                           issueName = issueName + " (encoded in Ascii HEX)";
+                           issueEncoding = issueEncoding + " (encoded in Ascii HEX)";
                        } else if (magicPosBase64Gzip > -1) {
                            markerStartPos = helpers.indexOf(newRequest, base64GzipMagic, false, 0, newRequest.length);
-                           issueName = issueName + " (encoded in Base64 and Gzipped)";
+                           issueEncoding = issueEncoding + " (encoded in Base64 and Gzipped)";
                        } else {
                            markerStartPos = helpers.indexOf(newRequest, gzipMagic, false, 0, newRequest.length);
-                           issueName = issueName + " (encoded/compressed with Gzip)";
+                           issueEncoding = issueEncoding + " (encoded/compressed with Gzip)";
                        }
                        requestMarkers.add(new int[]{markerStartPos,newRequest.length});
-                        
-                          issues.add(new CustomScanIssue(
-                                  baseRequestResponse.getHttpService(),
-                                  helpers.analyzeRequest(baseRequestResponse).getUrl(), 
-                                  new IHttpRequestResponse[] { callbacks.applyMarkers(checkRequestResponse, requestMarkers, new ArrayList<int[]>()) }, 
-                                  issueName,
-                                  activeScanSeverity,
-                                  activeScanConfidence,
-                                  activeScanIssueDetail + activeScanIssueDetailVulnerableLibrary + currentKey + ".",
-                                  activeScanRemediationDetail));
+                       
+                       if(currentKey.equals("URLDNS")) {
+	        				
+	        				issues.add(new CustomScanIssue(
+	                                baseRequestResponse.getHttpService(),
+	                                helpers.analyzeRequest(baseRequestResponse).getUrl(), 
+	                                new IHttpRequestResponse[] { callbacks.applyMarkers(checkRequestResponse, requestMarkers, new ArrayList<int[]>()) }, 
+	                                activeDetectionIssue + "DNS resolution" + issueEncoding,
+	                                activeDetectionSeverity,
+	                                activeDetectionConfidenceDns,
+	                                activeDetectionIssueDetails,
+	                                remediationDetail));
+	        				
+	        			} else {
+	        				
+	        				issues.add(new CustomScanIssue(
+	                                baseRequestResponse.getHttpService(),
+	                                helpers.analyzeRequest(baseRequestResponse).getUrl(), 
+	                                new IHttpRequestResponse[] { callbacks.applyMarkers(checkRequestResponse, requestMarkers, new ArrayList<int[]>()) }, 
+	                                rceIssue + rceIssueVulnerableLibrary + currentKey + issueEncoding,
+	                                rceSeverity,
+	                                (currentKey.contains("Sleep")) ? rceConfidenceSleep : rceConfidenceDns,
+	                                rceIssueDetail + rceIssueDetailVulnerableLibrary + currentKey + ". " + ((currentKey.contains("Sleep")) ? issueDetailTimeWarning : ""),
+	                                remediationDetail));
+	        				
+	        			}
 
                    }
                     
@@ -2056,49 +2113,82 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         			
         			positiveResult = true;
         			
-        			result = result + "<font color=\"red\"><b>Potentially VULNERABLE!!!</b></font>";
+        			result = result + "<font color=\"red\"><b>Potentially VULNERABLE!!!";
+        			if(testType.equals(BurpExtender.TEST_SLEEP) || testType.equals(BurpExtender.TEST_CPU)) {        			
+        				long durationMillis = TimeUnit.MILLISECONDS.convert((endTime - startTime), TimeUnit.NANOSECONDS);
+        				result = result + " Response time: " + durationMillis + " milliseconds";          				
+        			}
+        			result = result + "</b></font>";
         			
         			if(addManualIssueToScannerResultManualTesting.isSelected()) {
         				
         				List<int[]> requestMarkers = new ArrayList<int[]>();
         				requestMarkers.add(new int[] {payloadFrom,requestResponse.getRequest().length - postPayloadRequest.length});
         				
-        				StringBuilder issueName = new StringBuilder(activeScanIssue);
-        				if( testType.equals(BurpExtender.TEST_SLEEP) || testType.equals(BurpExtender.TEST_DNS)) {
-        					issueName.append(activeScanIssueVulnerableLibrary);
-        					issueName.append(currentKey);
-        				}
-				
+        				StringBuilder issueTransformations = new StringBuilder("");
         				if (!transformations.isEmpty()) {
         					boolean first = true;
         					for (Transformation t : transformations) {
-        						issueName.append(first ? " (" : ", ");
+        						issueTransformations.append(first ? " (" : ", ");
         						first = false;
-        						issueName.append(t.toString());
+        						issueTransformations.append(t.toString());
         					}
-        					issueName.append(')');
+        					issueTransformations.append(')');
         				}
         				
-        				String currentIssueDetail = activeScanIssueDetail;  
+        				String currentIssueDetail = rceIssueDetail;  
         				if( testType.equals(BurpExtender.TEST_SLEEP)|| testType.equals(BurpExtender.TEST_DNS)) {
-        					currentIssueDetail = currentIssueDetail + activeScanIssueDetailVulnerableLibrary + currentKey + ".";       					
+        					currentIssueDetail = currentIssueDetail + rceIssueDetailVulnerableLibrary + currentKey + ". ";       					
         				}
         				
+        				/*//TODO REmove
         				callbacks.addScanIssue(new CustomScanIssue(
         						requestResponse.getHttpService(),
                                 helpers.analyzeRequest(requestResponse).getUrl(), 
                                 new IHttpRequestResponse[] { callbacks.applyMarkers(requestResponse, requestMarkers, new ArrayList<int[]>()) }, 
                                 issueName.toString(),
-                                activeScanSeverity,
-                                activeScanConfidence,
+                                rceSeverity,
+                                rceConfidenceSleep,
                                 currentIssueDetail,
-                                activeScanRemediationDetail));   				
+                                remediationDetail));*/   	
+        				
+        				if(currentKey.equals("URLDNS") || currentKey.equals("SerialDOS limited")) {
+	        				
+        					callbacks.addScanIssue(new CustomScanIssue(
+        							requestResponse.getHttpService(),
+	                                helpers.analyzeRequest(requestResponse).getUrl(), 
+	                                new IHttpRequestResponse[] { callbacks.applyMarkers(requestResponse, requestMarkers, new ArrayList<int[]>()) }, 
+	                                activeDetectionIssue + ((currentKey.equals("URLDNS"))?"DNS resolution":"CPU time") + issueTransformations.toString() + " - Manual testing",
+	                                activeDetectionSeverity,
+	                                (currentKey.equals("URLDNS") ? activeDetectionConfidenceDns : activeDetectionConfidenceSleep),
+	                                activeDetectionIssueDetails + ((currentKey.equals("SerialDOS limited")) ? issueDetailTimeWarning : ""),
+	                                remediationDetail));
+	        				
+	        			} else {
+	        				
+	        				callbacks.addScanIssue(new CustomScanIssue(
+	        						requestResponse.getHttpService(),
+	                                helpers.analyzeRequest(requestResponse).getUrl(), 
+	                                new IHttpRequestResponse[] { callbacks.applyMarkers(requestResponse, requestMarkers, new ArrayList<int[]>()) }, 
+	                                rceIssue + rceIssueVulnerableLibrary + currentKey + issueTransformations.toString() + " - Manual testing",
+	                                rceSeverity,
+	                                (currentKey.contains("Sleep")) ? rceConfidenceSleep : rceConfidenceDns,
+	                                currentIssueDetail + ((currentKey.contains("Sleep")) ? issueDetailTimeWarning : ""),
+	                                remediationDetail));
+	        				
+	        			}        				
         				
         			}
         			
         		} else {
         			
         			result = result + "NOT vulnerable.";
+        			
+        			if(testType.equals(BurpExtender.TEST_SLEEP) || testType.equals(BurpExtender.TEST_CPU)) {   
+        				long durationMillis = TimeUnit.MILLISECONDS.convert((endTime - startTime), TimeUnit.NANOSECONDS);
+        				result = result + " Response time: " + durationMillis + " milliseconds";   				
+        			}
+        			
         			
         		}
         		
