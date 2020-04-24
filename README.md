@@ -26,7 +26,7 @@ Java Deserialization Scanner uses custom payloads generated with a modified vers
 
 Currently, the passive checks of the Java Deserialiation Scanner reported the presence of serialized Java objects in the HTTP requests and the active checks actively scan for the presence of weak deserialization functions in conjuction with the presence of the following weak libraries:
 
-1.	Apache Commons Collections 3 (up to 3.2.1), with four different chains
+1.	Apache Commons Collections 3 (up to 3.2.1), with five different chains
 2.	Apache Commons Collections 4 (up to 4.4.0), with two different chains
 3.	Spring (up to 4.2.2), with two different chains
 4.  Java 6 and Java 7 (up to Jdk7u21) without any weak library
@@ -35,6 +35,12 @@ Currently, the passive checks of the Java Deserialiation Scanner reported the pr
 7.	Rome
 8.	Java 8 (up to Jdk8u20) without any weak library
 9.	Apache Commons BeanUtils
+10.	Javassist/Weld
+11.	JBoss Interceptors
+12.	Mozilla Rhino (two different chains)
+13.	Vaadin
+
+Furthermore, **URLSNDS payload has been introduced** to actively **detect Java deserialization without any vulnerable libraris**. If the plugin find only the URLDNS issue (and no vulnerable libraries), the attacker probably can execute DoS attacks but to achieve Remote Code Execution it is necessary more effort. Refer to [this link](https://techblog.mediaservice.net/2020/04/java-deserialization-scanner-0-6-is-out/) for more details.
 
 All the components of the plugin supports the following encodings:
 
@@ -75,3 +81,12 @@ In order to improve this extension, please report any issue founded in the plugi
 
 # Disclaimer
 This software has been created purely for the purposes of academic research and for the development of effective defensive techniques, and is not intended to be used to attack systems except where explicitly authorized. Project maintainers are not responsible or liable for misuse of the software. Use responsibly.
+
+# MIT License
+Copyright (c) 2020 Java Deserialization Scanner
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:  
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.  
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
