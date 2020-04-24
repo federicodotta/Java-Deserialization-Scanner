@@ -1208,12 +1208,13 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     		while (iter.hasNext()) {
     			
     			currentKey = iter.next();
+    			    			
         		byte[] newPayload = null;
         		
         		if(magicPos > -1) {
         			newPayload = ArrayUtils.addAll(Arrays.copyOfRange(insertionPointBaseValue, 0, magicPos),currentPayloads.get(currentKey));
         		} else if(magicPosBase64 > -1) {
-        			newPayload = ArrayUtils.addAll(Arrays.copyOfRange(insertionPointBaseValue, 0, magicPosBase64),Base64.encodeBase64URLSafe(currentPayloads.get(currentKey)));
+        			newPayload = ArrayUtils.addAll(Arrays.copyOfRange(insertionPointBaseValue, 0, magicPosBase64),Base64.encodeBase64(currentPayloads.get(currentKey)));
         		} else if(magicPosAsciiHex > -1) {
         			newPayload = ArrayUtils.addAll(Arrays.copyOfRange(insertionPointBaseValue, 0, magicPosAsciiHex),Hex.encodeHexString(currentPayloads.get(currentKey)).getBytes());
         		} else if(magicPosBase64Gzip > -1) {
@@ -1222,6 +1223,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                     newPayload = ArrayUtils.addAll(Arrays.copyOfRange(insertionPointBaseValue, 0, magicPosGzip),gzipData(currentPayloads.get(currentKey))); 
                 }
         		
+        		int[] markers = insertionPoint.getPayloadOffsets(newPayload);
         		byte[] newRequest = insertionPoint.buildRequest(newPayload);
         		long startTime = System.nanoTime();
         		IHttpRequestResponse checkRequestResponse = callbacks.makeHttpRequest(baseRequestResponse.getHttpService(), newRequest);
@@ -1234,40 +1236,29 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         			collaboratorInteractions = collaboratorContext.fetchCollaboratorInteractionsFor(dnsCollaboratorUrls.get(currentKey));
         		}
         		        		
-        		if( (currentKey.contains("Sleep") && ((int)duration) >= 10 ) || (currentKey.contains("DNS") && collaboratorInteractions.size() > 0 ) ) {
+        		if( (currentKey.contains("Sleep") && ((int)duration) >= 9 ) || (currentKey.contains("DNS") && collaboratorInteractions.size() > 0 ) ) {
 
         			// Vulnerability found
         			
         			// Adding of marker for the vulnerability report
         			List<int[]> requestMarkers = new ArrayList<int[]>();
         			int markerStart = 0;
-        			int markerEnd = 0;
+        			int markerEnd = markers[1];
         			String issueEncoding = "";
         			
         			if(magicPos > -1) {
-        				markerStart =  helpers.indexOf(newRequest, helpers.urlEncode(currentPayloads.get(currentKey)), false, 0, newRequest.length);
-        				markerEnd = markerStart + helpers.urlEncode(currentPayloads.get(currentKey)).length;
+        				markerStart = markers[0] + magicPos; 
         			}else if(magicPosBase64 > -1) {
-        				markerStart = helpers.indexOf(newRequest, Base64.encodeBase64URLSafe(currentPayloads.get(currentKey)), false, 0, newRequest.length);
-        				markerEnd = markerStart + helpers.urlEncode(Base64.encodeBase64URLSafe(currentPayloads.get(currentKey))).length;
+        				markerStart = markers[0] + magicPosBase64; 
         				issueEncoding = issueEncoding + " (encoded in Base64)";
         			} else if(magicPosAsciiHex > -1) {
-        				markerStart = helpers.indexOf(newRequest, Hex.encodeHexString(currentPayloads.get(currentKey)).getBytes(), false, 0, newRequest.length);
-        				markerEnd = markerStart + helpers.urlEncode(Hex.encodeHexString(currentPayloads.get(currentKey)).getBytes()).length;
+        				markerEnd = markers[0] + magicPosAsciiHex;
         				issueEncoding = issueEncoding + " (encoded in Ascii HEX)";
         			} else if(magicPosBase64Gzip > -1) {
-                        //Need to use more comprehensive URL encoding as / doesn't get encoded
-                        try {
-                            markerStart = helpers.indexOf(newRequest, URLEncoder.encode(new String(Base64.encodeBase64(gzipData(currentPayloads.get(currentKey)))), "UTF-8").getBytes(), false, 0, newRequest.length);
-                            markerEnd = markerStart + URLEncoder.encode(new String(Base64.encodeBase64(gzipData(currentPayloads.get(currentKey)))), "UTF-8").getBytes().length;
-                            issueEncoding = issueEncoding + " (encoded in Base64 and Gzipped)";
-                        }
-                        catch (Exception ex) {
-                            stderr.println(ex.getMessage());
-                        }
+        				markerEnd = markers[0] + magicPosBase64Gzip;
+                        issueEncoding = issueEncoding + " (encoded in Base64 and Gzipped)";                        
                     } else {
-                        markerStart = helpers.indexOf(newRequest, gzipData(currentPayloads.get(currentKey)), false, 0, newRequest.length);
-                        markerEnd = markerStart + helpers.urlEncode(gzipData(currentPayloads.get(currentKey))).length;
+                    	markerEnd = markers[0] + magicPosGzip;
                         issueEncoding = issueEncoding + " (encoded/compressed with Gzip)";
                     }    			
 
@@ -1384,7 +1375,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                        newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPos),currentPayloads.get(currentKey));                
                    } else if(magicPosBase64 > -1) {
                        // Encode the payload in Base64
-                       newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPosBase64),Base64.encodeBase64URLSafe(currentPayloads.get(currentKey)));
+                       newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPosBase64),Base64.encodeBase64(currentPayloads.get(currentKey)));
                    } else if(magicPosAsciiHex > -1) {
                        // Encode the payload in Ascii HEX
                        newBody = ArrayUtils.addAll(Arrays.copyOfRange(request, bodyOffset, magicPosAsciiHex),Hex.encodeHexString(currentPayloads.get(currentKey)).getBytes());
@@ -1407,7 +1398,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                 	   collaboratorInteractions = collaboratorContext.fetchCollaboratorInteractionsFor(dnsCollaboratorUrls.get(currentKey));
                    }
         		
-                   if( (currentKey.contains("Sleep") && ((int)duration) >= 10 ) || (currentKey.contains("DNS") && collaboratorInteractions.size() > 0 ) ) {
+                   if( (currentKey.contains("Sleep") && ((int)duration) >= 9 ) || (currentKey.contains("DNS") && collaboratorInteractions.size() > 0 ) ) {
                                            
                        // Vulnerability found
                         
@@ -2109,7 +2100,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         		*/
         		
         		//if(( testType.equals(BurpExtender.TEST_SLEEP) && (((int)duration) >= 10)) || ( testType.equals(BurpExtender.TEST_CPU) && (((int)duration) >= 60)) ){
-        		if( ( ( testType.equals(BurpExtender.TEST_SLEEP) || testType.equals(BurpExtender.TEST_CPU) ) && (((int)duration) >= 10) ) || (( testType.equals(BurpExtender.TEST_DNS) || testType.equals(BurpExtender.TEST_URLDNS) ) && ( collaboratorInteractions.size() > 0 ) ) ) {
+        		if( ( ( testType.equals(BurpExtender.TEST_SLEEP) || testType.equals(BurpExtender.TEST_CPU) ) && (((int)duration) >= 9) ) || (( testType.equals(BurpExtender.TEST_DNS) || testType.equals(BurpExtender.TEST_URLDNS) ) && ( collaboratorInteractions.size() > 0 ) ) ) {
         			
         			positiveResult = true;
         			
