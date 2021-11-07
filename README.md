@@ -1,5 +1,5 @@
 # Java Deserialization Scanner
-Java Deserialization Scanner is a Burp Suite plugin aimed at detect and exploit Java deserialization vulnerabilities. It was written by Federico Dotta, a Security Advisor at @ Mediaservice.net. 
+Java Deserialization Scanner is a Burp Suite plugin aimed at detect and exploit Java deserialization vulnerabilities. It was written by Federico Dotta, Principal Security Analyst at HN Security.
 
 The plugin is made up of three different components:
 
@@ -8,7 +8,7 @@ The plugin is made up of three different components:
 3.	Exploiter, that allow to actively exploit Java deserialization vulnerabilies, using frohoff ysoserial (https://github.com/frohoff/ysoserial)
 
 # Author
-- Federico Dotta, Security Advisor at @ Mediaservice.net
+- Federico Dotta, Principal Security Analyst at HN Security
 
 # Contributors
 - Jeremy Goldstein
@@ -16,7 +16,7 @@ The plugin is made up of three different components:
 
 # Mini walkthrough (24/05/17)
 A brief article containing a mini walkthrough on how to use the various components of the plugin can be found at the following URL:
-https://techblog.mediaservice.net/2017/05/reliable-discovery-and-exploitation-of-java-deserialization-vulnerabilities/
+https://web.archive.org/web/20201130104913/https://techblog.mediaservice.net/2017/05/reliable-discovery-and-exploitation-of-java-deserialization-vulnerabilities/
 
 # Integration with Burp Suite active and passive scanner
 Java Deserialization Scanner uses custom payloads generated with a modified version of "ysoserial", tool created by frohoff and gebl, to detect Java deserialization vulnerabilities. The original tool (https://github.com/frohoff/ysoserial) generate payloads for the execution of commands on the system, using the Runtime.exec function. Usually, however, it is not possible to see the output of the command and consequently it is not simple to write a scanner based on this kind of function. For this reason, a modified version of ysoserial is used to generate different types of payloads, usefull for the detection of the issue instead of the exploitation:
@@ -40,7 +40,7 @@ Currently, the passive checks of the Java Deserialiation Scanner reported the pr
 12.	Mozilla Rhino (two different chains)
 13.	Vaadin
 
-Furthermore, **URLSNDS payload has been introduced** to actively **detect Java deserialization without any vulnerable libraris**. If the plugin find only the URLDNS issue (and no vulnerable libraries), the attacker probably can execute DoS attacks but to achieve Remote Code Execution it is necessary more effort. Refer to [this link](https://techblog.mediaservice.net/2020/04/java-deserialization-scanner-0-6-is-out/) for more details.
+Furthermore, **URLSNDS payload has been introduced** to actively **detect Java deserialization without any vulnerable libraris**. If the plugin find only the URLDNS issue (and no vulnerable libraries), the attacker probably can execute DoS attacks but to achieve Remote Code Execution it is necessary more effort. Refer to [this link](https://web.archive.org/web/20210312114921/https://techblog.mediaservice.net/2020/04/java-deserialization-scanner-0-6-is-out/) for more details.
 
 All the components of the plugin supports the following encodings:
 

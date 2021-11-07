@@ -149,8 +149,9 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
     
     private JTabbedPane mainPanel;
     
+    private JTextField javaPath;
     private JTextField ysoserialPath;
-    
+        
     private String dialogTitle;
     private String dialogMessage;
     private String[] dialogButtonsMessages;
@@ -390,7 +391,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
         
         urlBodyAlreadyScanned = new ArrayList<String>();
         
-        stdout.println("Java Deserialization Scanner v0.5 - The all-in-one plugin for the detection and the exploitation of Java deserialization vulnerabilities");
+        stdout.println("Java Deserialization Scanner v0.7 - The all-in-one plugin for the detection and the exploitation of Java deserialization vulnerabilities");
         stdout.println("Created by: Federico Dotta");
         stdout.println("Contributors: Jeremy Goldstein, Andras Veres-Szentkiralyi");
         stdout.println("");
@@ -802,12 +803,22 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                 configurationTitleExploiting.setFont(new Font("Nimbus", Font.BOLD, 16));
                 configurationTitleExploiting.setAlignmentX(Component.LEFT_ALIGNMENT); 
                 
+                JPanel javaPathJPanel = new JPanel();
+                javaPathJPanel.setLayout(new BoxLayout(javaPathJPanel, BoxLayout.X_AXIS));
+                javaPathJPanel.setAlignmentX(Component.LEFT_ALIGNMENT); 
+                JLabel labelJavaPath = new JLabel("Java path (recent Java major versions do not allow to run ysoserial properly): ");
+                javaPath = new JTextField(200);                
+                javaPath.setText("java");
+                javaPath.setMaximumSize( javaPath.getPreferredSize() );
+                javaPathJPanel.add(labelJavaPath);
+                javaPathJPanel.add(javaPath);
+                
                 JPanel configurationPaneButtonJPanel = new JPanel();
                 configurationPaneButtonJPanel.setLayout(new BoxLayout(configurationPaneButtonJPanel, BoxLayout.X_AXIS));
                 configurationPaneButtonJPanel.setAlignmentX(Component.LEFT_ALIGNMENT); 
                 JLabel labelConfigurationPaneYsoserialPath = new JLabel("Ysoserial path: ");
                 ysoserialPath = new JTextField(200);                
-                ysoserialPath.setText("ysoserial-0.0.4-all.jar");
+                ysoserialPath.setText("ysoserial.jar");
                 ysoserialPath.setMaximumSize( ysoserialPath.getPreferredSize() );
                 configurationPaneButtonJPanel.add(labelConfigurationPaneYsoserialPath);
                 configurationPaneButtonJPanel.add(ysoserialPath);
@@ -828,7 +839,8 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
                 mainPanelConfiguration.add(addManualIssueToScannerResultManualTesting);                
                 mainPanelConfiguration.add(verboseModeManualTesting);
                 mainPanelConfiguration.add(separatorConfigurationManualTesting);
-                mainPanelConfiguration.add(configurationTitleExploiting);    
+                mainPanelConfiguration.add(configurationTitleExploiting);  
+                mainPanelConfiguration.add(javaPathJPanel);                
                 mainPanelConfiguration.add(configurationPaneButtonJPanel);
                 mainPanelConfiguration.add(enableExploitationHibernate5);   
 
@@ -1837,6 +1849,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 	
 	public byte[] generateYsoserialPayload() {
 		
+		String pathJava = javaPath.getText().trim();
 		String pathYsoserial = ysoserialPath.getText().trim();
 		
 		try {
@@ -1847,10 +1860,10 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 			
 			String[] commands;
 			if(enableExploitationHibernate5.isSelected()) {
-				String[] temp = {"java","-Dhibernate5","-jar",pathYsoserial};
+				String[] temp = {pathJava,"-Dhibernate5","-jar",pathYsoserial};
 				commands = temp;
 			} else {
-				String[] temp = {"java","-jar",pathYsoserial};
+				String[] temp = {pathJava,"-jar",pathYsoserial};
 				commands = temp;
 			}
 			String[] fullCommands = ArrayUtils.addAll(commands, commandParts);
