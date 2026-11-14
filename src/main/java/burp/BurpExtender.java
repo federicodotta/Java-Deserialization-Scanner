@@ -1848,58 +1848,77 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab, ActionL
 	}
 	
 	public byte[] generateYsoserialPayload() {
-		
-		String pathJava = javaPath.getText().trim();
-		String pathYsoserial = ysoserialPath.getText().trim();
-		
-		try {
-			
-			String[] commandParts = translateCommandline(requestAreaExploitingBottom.getText().trim());
-			
-			Runtime rt = Runtime.getRuntime();
-			
-			String[] commands;
-			if(enableExploitationHibernate5.isSelected()) {
-				String[] temp = {pathJava,"-Dhibernate5","-jar",pathYsoserial};
-				commands = temp;
-			} else {
-				String[] temp = {pathJava,"-jar",pathYsoserial};
-				commands = temp;
-			}
-			String[] fullCommands = ArrayUtils.addAll(commands, commandParts);
-			Process proc = rt.exec(fullCommands);
-			
-			InputStream stdInput = proc.getInputStream();
-			BufferedReader stdError = new BufferedReader(new InputStreamReader(proc.getErrorStream()));
-			
-			byte[] outputYSoSerial = IOUtils.toByteArray(stdInput);
-			
-			if(outputYSoSerial.length == 0) {
-				
-				String s = stdError.readLine();
-				if(s != null) {
-					stderr.println("ERROR");
-					stderr.println(s);
-					while ((s = stdError.readLine()) != null) {
-						stderr.println(s);
-					}
-				}
-				
-				return null;
-				
-			} else {
-				
-				return outputYSoSerial;
-				
-			}
-						
-		} catch (IOException e) {
-			stderr.println(e.toString());
-			return null;
-		}
-		
-		
-	}
+    
+    String pathJava = javaPath.getText().trim();
+    String pathYsoserial = ysoserialPath.getText().trim();
+
+    try {
+        String[] commandParts = translateCommandline(requestAreaExploitingBottom.getText().trim());
+        
+        String[] addOpens = {
+            "--add-opens=java.xml/com.sun.org.apache.xalan.internal.xsltc.trax=ALL-UNNAMED",
+            "--add-opens=java.xml/com.sun.org.apache.xalan.internal.xsltc.runtime=ALL-UNNAMED",
+            "--add-opens=java.base/sun.reflect.annotation=ALL-UNNAMED",
+            "--add-opens=java.base/java.util=ALL-UNNAMED",
+            "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED"
+        };
+
+        String[] commands;
+        if (enableExploitationHibernate5.isSelected()) {
+            commands = new String[]{pathJava, "-Dhibernate5"};
+        } else {
+            commands = new String[]{pathJava};
+        }
+
+        String[] fullCommands = ArrayUtils.addAll(commands, addOpens);
+        fullCommands = ArrayUtils.addAll(fullCommands, new String[]{"-jar", pathYsoserial});
+        fullCommands = ArrayUtils.addAll(fullCommands, commandParts);
+
+        ProcessBuilder pb = new ProcessBuilder(fullCommands);
+        pb.redirectErrorStream(false);
+        Process proc = pb.start();
+
+        // Drain stderr on a background thread to prevent deadlock
+        final StringBuilder errorOutput = new StringBuilder();
+        Thread stderrDrainer = new Thread(() -> {
+            try {
+                BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(proc.getErrorStream()));
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    errorOutput.append(line).append("\n");
+                }
+            } catch (IOException e) {
+                stderr.println("Error reading stderr: " + e.getMessage());
+            }
+        });
+        stderrDrainer.start();
+
+        byte[] outputYSoSerial = IOUtils.toByteArray(proc.getInputStream());
+
+        // Wait for stderr drainer to finish before reading errorOutput
+        try {
+            stderrDrainer.join();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        if (outputYSoSerial.length == 0) {
+            String errMsg = errorOutput.toString();
+            if (!errMsg.isEmpty()) {
+                stderr.println("ERROR");
+                stderr.println(errMsg);
+            }
+            return null;
+        } else {
+            return outputYSoSerial;
+        }
+
+    } catch (IOException e) {
+        stderr.println(e.toString());
+        return null;
+    }
+}
 	
 	public void attackExploitation(List<Transformation> transformations, int encoding) {		
 		
